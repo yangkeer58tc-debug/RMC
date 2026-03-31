@@ -1,0 +1,140 @@
+import { useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import TopBar from '@/components/TopBar'
+import { importResumeUpload, importResumeUrl } from '@/lib/api'
+import { cn } from '@/lib/utils'
+
+type Tab = 'upload' | 'url'
+
+export default function ImportPage() {
+  const nav = useNavigate()
+  const [tab, setTab] = useState<Tab>('upload')
+  const [file, setFile] = useState<File | null>(null)
+  const [url, setUrl] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const canSubmit = useMemo(() => {
+    if (busy) return false
+    if (tab === 'upload') return !!file
+    return !!url.trim()
+  }, [busy, tab, file, url])
+
+  async function onSubmit() {
+    setError(null)
+    setBusy(true)
+    try {
+      const data =
+        tab === 'upload'
+          ? await importResumeUpload(file as File)
+          : await importResumeUrl(url.trim())
+
+      nav(`/resumes/${data.resumeId}`)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : '导入失败')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="min-h-screen bg-zinc-50">
+      <TopBar />
+      <main className="mx-auto max-w-3xl px-4 py-8">
+        <div className="mb-6">
+          <h1 className="text-lg font-semibold text-zinc-900">导入简历</h1>
+          <p className="mt-1 text-sm text-zinc-600">支持上传文件或输入文件链接导入，自动解析并入库。</p>
+        </div>
+
+        <div className="rounded-lg border border-zinc-200 bg-white p-4">
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setTab('upload')}
+              className={cn(
+                'rounded-md px-3 py-2 text-sm font-medium transition-colors',
+                tab === 'upload'
+                  ? 'bg-zinc-900 text-white'
+                  : 'bg-zinc-100 text-zinc-700 hover:bg-zinc-200',
+              )}
+            >
+              手动上传
+            </button>
+            <button
+              type="button"
+              onClick={() => setTab('url')}
+              className={cn(
+                'rounded-md px-3 py-2 text-sm font-medium transition-colors',
+                tab === 'url'
+                  ? 'bg-zinc-900 text-white'
+                  : 'bg-zinc-100 text-zinc-700 hover:bg-zinc-200',
+              )}
+            >
+              文件链接
+            </button>
+          </div>
+
+          <div className="mt-4">
+            {tab === 'upload' ? (
+              <div className="space-y-3">
+                <label className="block text-sm font-medium text-zinc-800">选择文件（PDF / DOCX / TXT）</label>
+                <input
+                  type="file"
+                  accept=".pdf,.docx,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain"
+                  onChange={(e) => setFile(e.target.files?.[0] || null)}
+                  className="block w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm"
+                />
+                {file ? (
+                  <div className="text-xs text-zinc-600">
+                    已选择：{file.name}（{Math.ceil(file.size / 1024)} KB）
+                  </div>
+                ) : null}
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <label className="block text-sm font-medium text-zinc-800">文件链接（可公开访问的直链）</label>
+                <input
+                  value={url}
+                  onChange={(e) => setUrl(e.target.value)}
+                  placeholder="https://example.com/resume.pdf"
+                  className="block w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm"
+                />
+                <div className="text-xs text-zinc-600">仅支持 http/https，文件最大 15MB。部署到 Cloudflare Pages 后会使用站点自带的代理下载以绕过 CORS。</div>
+              </div>
+            )}
+          </div>
+
+          {error ? (
+            <div className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+              {error}
+            </div>
+          ) : null}
+
+          <div className="mt-4 flex items-center justify-between">
+            <div className="text-xs text-zinc-500">导入后会进入详情页，可手动校正字段。</div>
+            <button
+              type="button"
+              onClick={onSubmit}
+              disabled={!canSubmit}
+              className={cn(
+                'rounded-md px-4 py-2 text-sm font-medium text-white transition-colors',
+                canSubmit ? 'bg-blue-600 hover:bg-blue-700' : 'bg-zinc-300',
+              )}
+            >
+              {busy ? '导入中…' : '开始导入'}
+            </button>
+          </div>
+        </div>
+
+        <div className="mt-6 rounded-lg border border-zinc-200 bg-white p-4">
+          <h2 className="text-sm font-semibold text-zinc-900">解析说明</h2>
+          <ul className="mt-2 space-y-1 text-sm text-zinc-600">
+            <li>字段抽取基于本地解析与规则匹配，不使用任何付费 API。</li>
+            <li>自我介绍摘要为抽取式摘要，保持原语言，不做翻译。</li>
+            <li>解析不准的字段可在详情页手动修改并保存。</li>
+          </ul>
+        </div>
+      </main>
+    </div>
+  )
+}

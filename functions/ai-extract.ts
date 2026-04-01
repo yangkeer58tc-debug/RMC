@@ -38,6 +38,18 @@ function asString(v: unknown, max = 500) {
   return t.slice(0, max)
 }
 
+function cleanSummary(s: string) {
+  const t = s.replace(/\s+/g, ' ').trim()
+  if (!t) return t
+  const endsWithPunct = /[.!?。！？]$/.test(t)
+  const lastPunct = Math.max(t.lastIndexOf('.'), t.lastIndexOf('!'), t.lastIndexOf('?'), t.lastIndexOf('。'), t.lastIndexOf('！'), t.lastIndexOf('？'))
+  if (!endsWithPunct && lastPunct >= 0 && t.length - lastPunct <= 20) {
+    const cut = t.slice(0, lastPunct + 1).trim()
+    if (cut) return cut
+  }
+  return endsWithPunct ? t : `${t}.`
+}
+
 function asNumberInt(v: unknown, min: number, max: number) {
   if (typeof v !== 'number' || !Number.isFinite(v)) return null
   const n = Math.trunc(v)
@@ -59,7 +71,8 @@ function normalizeResult(obj: any): ExtractResult {
   out.intro_summary_original = asString(obj?.intro_summary_original, 900)
   out.intro_language = asString(obj?.intro_language, 12)
   out.education = Array.isArray(obj?.education) ? obj.education.slice(0, 12) : null
-  out.profile_summary = asString(obj?.profile_summary, 1200)
+  const rawProfile = asString(obj?.profile_summary, 1200)
+  out.profile_summary = rawProfile ? cleanSummary(rawProfile) : null
   out.profile_summary_language = asString(obj?.profile_summary_language, 12)
   return out
 }
@@ -129,7 +142,7 @@ export async function onRequestPost(context: { request: Request; env: Record<str
     '- work_years MUST be derived from explicit date ranges in the text; use current year for Present; if ranges are missing, return null.\n' +
     '- For OCR text, prioritize lines near headings like NAME/CONTACT/LOCATION/ABOUT/EXPERIENCE.\n' +
     '- intro_summary_original must keep the resume original language.\n' +
-    '- profile_summary MUST be a recruiter-facing summary in the SAME language as the resume, 200-400 words (or 200-400 CJK characters if the resume is in Chinese/Japanese/Korean); do NOT directly copy long sentences; do not invent facts; include role, seniority, key skills, domain, location if present. Set profile_summary_language to the language code (e.g., en, pt, fr, zh).'
+    '- profile_summary MUST be a recruiter-facing summary in the SAME language as the resume, 200-400 words (or 200-400 CJK characters if the resume is in Chinese/Japanese/Korean); do NOT directly copy long sentences; do not invent facts; include role, seniority, key skills, domain, location if present. It must end with a complete sentence. Set profile_summary_language to the language code (e.g., en, pt, fr, zh).'
 
   const base = baseUrl.replace(/\/$/, '')
   const url = base.endsWith('/v1') ? base + '/chat/completions' : base + '/v1/chat/completions'

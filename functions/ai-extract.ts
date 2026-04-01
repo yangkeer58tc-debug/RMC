@@ -13,6 +13,7 @@ type ExtractResult = {
   intro_language?: string | null
   profile_summary?: string | null
   profile_summary_language?: string | null
+  job_direction?: string | null
 }
 
 function json(data: unknown, init?: { status?: number }) {
@@ -74,6 +75,7 @@ function normalizeResult(obj: any): ExtractResult {
   const rawProfile = asString(obj?.profile_summary, 1200)
   out.profile_summary = rawProfile ? cleanSummary(rawProfile) : null
   out.profile_summary_language = asString(obj?.profile_summary_language, 12)
+  out.job_direction = asString(obj?.job_direction, 60)
   return out
 }
 
@@ -134,7 +136,7 @@ export async function onRequestPost(context: { request: Request; env: Record<str
   const user =
     `Resume filename: ${filename || ''}\n` +
     `Resume text:\n${text}\n\n` +
-    'Return JSON with keys: full_name, first_name, last_name, country, city, email, whatsapp, phone, work_years, education, intro_summary_original, intro_language, profile_summary, profile_summary_language. Use null when unknown.\n' +
+    'Return JSON with keys: full_name, first_name, last_name, country, city, email, whatsapp, phone, work_years, education, intro_summary_original, intro_language, profile_summary, profile_summary_language, job_direction. Use null when unknown.\n' +
     '- full_name should be the display name.\n' +
     '- first_name/last_name should be split if possible.\n' +
     '- country should be a country name (e.g., United Arab Emirates) or ISO-2 if clearly present; do not guess.\n' +
@@ -143,6 +145,8 @@ export async function onRequestPost(context: { request: Request; env: Record<str
     '- For OCR text, prioritize lines near headings like NAME/CONTACT/LOCATION/ABOUT/EXPERIENCE.\n' +
     '- intro_summary_original must keep the resume original language.\n' +
     '- profile_summary MUST be a recruiter-facing summary in the SAME language as the resume, 200-400 words (or 200-400 CJK characters if the resume is in Chinese/Japanese/Korean); do NOT directly copy long sentences; do not invent facts; include role, seniority, key skills, domain, location if present. It must end with a complete sentence. Set profile_summary_language to the language code (e.g., en, pt, fr, zh).'
+    +
+    '\n- job_direction MUST be a short English category inferred from roles (e.g., Driver, Chef, Security Guard, Cleaner, Warehouse Worker, Administrative Assistant). If unclear, return null.'
 
   const base = baseUrl.replace(/\/$/, '')
   const url = base.endsWith('/v1') ? base + '/chat/completions' : base + '/v1/chat/completions'

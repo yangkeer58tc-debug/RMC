@@ -162,7 +162,11 @@ export default function ResumesPage() {
                   {[it.country, it.city].filter(Boolean).join(' / ') || '-'}
                 </div>
                 <div className="col-span-3 truncate text-zinc-700">
-                  {[it.email, it.phone, it.whatsapp].filter(Boolean).join(' · ') || '-'}
+                  <div className="flex items-center gap-2">
+                    <span className={it.email ? 'text-emerald-700' : 'text-zinc-400'}>E</span>
+                    <span className={it.whatsapp ? 'text-emerald-700' : 'text-zinc-400'}>W</span>
+                    <span className={it.phone ? 'text-emerald-700' : 'text-zinc-400'}>P</span>
+                  </div>
                 </div>
                 <div className="col-span-1 text-zinc-700">{it.work_years ?? '-'}</div>
                 <div className="col-span-2 flex items-center gap-2">

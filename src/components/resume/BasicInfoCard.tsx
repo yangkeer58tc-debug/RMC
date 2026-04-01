@@ -44,6 +44,24 @@ export default function BasicInfoCard({
             className="w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm"
           />
         </Field>
+        <Field label="方向">
+          <input
+            value={effective.job_direction || ''}
+            onChange={(e) => setField('job_direction', e.target.value || null)}
+            className="w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm"
+          />
+        </Field>
+        <Field label="备注">
+          <input
+            value={effective.admin_note || ''}
+            onChange={(e) => {
+              const v = e.target.value.slice(0, 20)
+              setField('admin_note', v || null)
+            }}
+            maxLength={20}
+            className="w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm"
+          />
+        </Field>
         <Field label="国家">
           <input
             value={effective.country || ''}

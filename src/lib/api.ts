@@ -194,6 +194,8 @@ export async function importResumeUpload(file: File, opts?: ImportOpts) {
         introLanguage: pickFirst(ai.intro_language, parsed.introLanguage) || undefined,
       }
 
+      ;(parsed as any).jobDirection = pickFirst(ai.job_direction, (parsed as any).jobDirection) || undefined
+
       ;(parsed as any).profileSummary = pickFirst(ai.profile_summary, (parsed as any).profileSummary) || undefined
       ;(parsed as any).profileSummaryLanguage = pickFirst(ai.profile_summary_language, parsed.introLanguage) || undefined
 
@@ -225,6 +227,8 @@ export async function importResumeUpload(file: File, opts?: ImportOpts) {
     first_name: ((parsed as any).firstName as string | undefined) || null,
     last_name: ((parsed as any).lastName as string | undefined) || null,
     name: (parsed.name || inferNameFromFilename(file.name)) || null,
+    job_direction: ((parsed as any).jobDirection as string | undefined) || null,
+    admin_note: null,
     country: parsed.country || null,
     city: parsed.city || null,
     email: parsed.email || null,
@@ -340,6 +344,8 @@ export async function importResumeUrl(url: string, opts?: ImportOpts) {
         introLanguage: pickFirst(ai.intro_language, parsed.introLanguage) || undefined,
       }
 
+      ;(parsed as any).jobDirection = pickFirst(ai.job_direction, (parsed as any).jobDirection) || undefined
+
       ;(parsed as any).profileSummary = pickFirst(ai.profile_summary, (parsed as any).profileSummary) || undefined
       ;(parsed as any).profileSummaryLanguage = pickFirst(ai.profile_summary_language, parsed.introLanguage) || undefined
 
@@ -371,6 +377,8 @@ export async function importResumeUrl(url: string, opts?: ImportOpts) {
     first_name: ((parsed as any).firstName as string | undefined) || null,
     last_name: ((parsed as any).lastName as string | undefined) || null,
     name: (parsed.name || inferNameFromFilename(filename)) || null,
+    job_direction: ((parsed as any).jobDirection as string | undefined) || null,
+    admin_note: null,
     country: parsed.country || null,
     city: parsed.city || null,
     email: parsed.email || null,
@@ -439,6 +447,8 @@ export async function updateResume(id: string, patch: Partial<ResumeDetail>) {
     'first_name',
     'last_name',
     'name',
+    'job_direction',
+    'admin_note',
     'country',
     'city',
     'email',
@@ -516,6 +526,8 @@ export async function reparseResume(id: string) {
         introLanguage: pickFirst(ai.intro_language, parsed.introLanguage) || undefined,
       }
 
+      ;(parsed as any).jobDirection = pickFirst(ai.job_direction, (parsed as any).jobDirection) || undefined
+
       ;(parsed as any).profileSummary = pickFirst(ai.profile_summary, (parsed as any).profileSummary) || undefined
       ;(parsed as any).profileSummaryLanguage = pickFirst(ai.profile_summary_language, parsed.introLanguage) || undefined
 
@@ -537,6 +549,7 @@ export async function reparseResume(id: string) {
     first_name: ((parsed as any).firstName as string | undefined) || null,
     last_name: ((parsed as any).lastName as string | undefined) || null,
     name: (parsed.name || inferNameFromFilename(filename)) || null,
+    job_direction: ((parsed as any).jobDirection as string | undefined) || null,
     country: parsed.country || null,
     city: parsed.city || null,
     email: parsed.email || null,

@@ -364,8 +364,37 @@ async function ocrPdf(arrayBuffer: ArrayBuffer, opts?: ExtractOptions) {
   return chunks.join('\n').trim()
 }
 
+async function ocrImageFile(file: File, opts?: ExtractOptions) {
+  opts?.onProgress?.({ stage: 'ocr:init' })
+  const { createWorker } = await import('tesseract.js')
+  const worker = await createWorker('eng', 1, {
+    logger: (m) => {
+      const stage = m?.status ? `ocr:${m.status}` : 'ocr:working'
+      opts?.onProgress?.({ stage, progress: m?.progress })
+    },
+  })
+
+  await worker.load()
+  await worker.reinitialize('eng')
+
+  const dataUrl = await new Promise<string>((resolve, reject) => {
+    const r = new FileReader()
+    r.onerror = () => reject(new Error('读取图片失败'))
+    r.onload = () => resolve(String(r.result || ''))
+    r.readAsDataURL(file)
+  })
+
+  opts?.onProgress?.({ stage: 'ocr:recognize' })
+  const result = await worker.recognize(dataUrl)
+  await worker.terminate()
+  return (result?.data?.text || '').trim()
+}
+
 export async function extractTextFromFile(file: File, opts?: ExtractOptions): Promise<string> {
   const lower = file.name.toLowerCase()
+  if (file.type.startsWith('image/') || /\.(png|jpe?g)$/i.test(lower)) {
+    return await ocrImageFile(file, opts)
+  }
   if (lower.endsWith('.pdf')) {
     const original = await file.arrayBuffer()
     const bufForText = original.slice(0)

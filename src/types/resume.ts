@@ -13,6 +13,8 @@ export type ResumeListItem = {
   first_name: string | null
   last_name: string | null
   name: string | null
+  job_direction: string | null
+  admin_note: string | null
   country: string | null
   city: string | null
   email: string | null

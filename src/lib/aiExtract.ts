@@ -13,6 +13,7 @@ export type AiExtractResult = {
   intro_language?: string | null
   profile_summary?: string | null
   profile_summary_language?: string | null
+  job_direction?: string | null
 }
 
 export type AiExtractMeta = {

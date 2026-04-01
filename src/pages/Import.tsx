@@ -89,7 +89,7 @@ export default function ImportPage() {
                 <input
                   type="file"
                   multiple
-                  accept=".pdf,.docx,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain"
+                  accept=".pdf,.docx,.txt,.png,.jpg,.jpeg,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain,image/png,image/jpeg"
                   onChange={(e) => setFiles(Array.from(e.target.files || []))}
                   className="block w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm"
                 />

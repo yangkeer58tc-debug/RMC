@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import TopBar from '@/components/TopBar'
 import StatusBadge from '@/components/StatusBadge'
-import { listResumes } from '@/lib/api'
+import { listResumes, updateResume } from '@/lib/api'
 import { cn } from '@/lib/utils'
 import type { ResumeListItem } from '@/types/resume'
 
@@ -13,14 +13,14 @@ export default function ResumesPage() {
 
   const [q, setQ] = useState('')
   const [country, setCountry] = useState('')
-  const [city, setCity] = useState('')
   const [status, setStatus] = useState('')
-  const [minWorkYears, setMinWorkYears] = useState('')
-  const [maxWorkYears, setMaxWorkYears] = useState('')
+  const [draftNote, setDraftNote] = useState<Record<string, string>>({})
+  const [draftDirection, setDraftDirection] = useState<Record<string, string>>({})
+  const [saving, setSaving] = useState<Record<string, boolean>>({})
 
   const params = useMemo(
-    () => ({ q, country, city, status, minWorkYears, maxWorkYears }),
-    [q, country, city, status, minWorkYears, maxWorkYears],
+    () => ({ q, country, status }),
+    [q, country, status],
   )
 
   const load = useCallback(async () => {
@@ -29,12 +29,41 @@ export default function ResumesPage() {
     try {
       const data = await listResumes(params)
       setItems(data.items)
+      setDraftNote((prev) => {
+        const next = { ...prev }
+        for (const it of data.items) {
+          if (typeof next[it.id] !== 'string') next[it.id] = it.admin_note || ''
+        }
+        return next
+      })
+      setDraftDirection((prev) => {
+        const next = { ...prev }
+        for (const it of data.items) {
+          if (typeof next[it.id] !== 'string') next[it.id] = it.job_direction || ''
+        }
+        return next
+      })
     } catch (e) {
       setError(e instanceof Error ? e.message : '加载失败')
     } finally {
       setBusy(false)
     }
   }, [params])
+
+  const save = useCallback(
+    async (id: string, patch: Partial<ResumeListItem>) => {
+      setSaving((s) => ({ ...s, [id]: true }))
+      try {
+        const res = await updateResume(id, patch as any)
+        setItems((items) => items.map((it) => (it.id === id ? (res.item as any) : it)))
+      } catch (e) {
+        setError(e instanceof Error ? e.message : '保存失败')
+      } finally {
+        setSaving((s) => ({ ...s, [id]: false }))
+      }
+    },
+    [setItems],
+  )
 
   useEffect(() => {
     void load()
@@ -47,7 +76,7 @@ export default function ResumesPage() {
         <div className="mb-6 flex items-start justify-between gap-4">
           <div>
             <h1 className="text-lg font-semibold text-zinc-900">简历列表</h1>
-            <p className="mt-1 text-sm text-zinc-600">支持按姓名、国家/城市、工作年限与状态筛选。</p>
+            <p className="mt-1 text-sm text-zinc-600">支持按姓名、国家与状态筛选。</p>
           </div>
           <button
             type="button"
@@ -63,7 +92,7 @@ export default function ResumesPage() {
         </div>
 
         <div className="rounded-lg border border-zinc-200 bg-white p-4">
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-6">
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
             <input
               value={q}
               onChange={(e) => setQ(e.target.value)}
@@ -74,24 +103,6 @@ export default function ResumesPage() {
               value={country}
               onChange={(e) => setCountry(e.target.value)}
               placeholder="国家"
-              className="w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm"
-            />
-            <input
-              value={city}
-              onChange={(e) => setCity(e.target.value)}
-              placeholder="城市"
-              className="w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm"
-            />
-            <input
-              value={minWorkYears}
-              onChange={(e) => setMinWorkYears(e.target.value)}
-              placeholder="最小年限"
-              className="w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm"
-            />
-            <input
-              value={maxWorkYears}
-              onChange={(e) => setMaxWorkYears(e.target.value)}
-              placeholder="最大年限"
               className="w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm"
             />
           </div>
@@ -120,10 +131,7 @@ export default function ResumesPage() {
                 onClick={() => {
                   setQ('')
                   setCountry('')
-                  setCity('')
                   setStatus('')
-                  setMinWorkYears('')
-                  setMaxWorkYears('')
                 }}
                 className="rounded-md bg-zinc-100 px-3 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-200"
               >
@@ -143,10 +151,11 @@ export default function ResumesPage() {
         <div className="mt-4 overflow-hidden rounded-lg border border-zinc-200 bg-white">
           <div className="grid grid-cols-12 gap-0 border-b border-zinc-200 bg-zinc-50 px-4 py-2 text-xs font-semibold text-zinc-700">
             <div className="col-span-3">姓名</div>
-            <div className="col-span-2">国家/城市</div>
-            <div className="col-span-3">联系方式</div>
-            <div className="col-span-1">年限</div>
-            <div className="col-span-2">状态</div>
+            <div className="col-span-1">国家</div>
+            <div className="col-span-2">联系方式</div>
+            <div className="col-span-2">方向</div>
+            <div className="col-span-2">备注</div>
+            <div className="col-span-1">状态</div>
             <div className="col-span-1 text-right">操作</div>
           </div>
           {items.length ? (
@@ -158,22 +167,55 @@ export default function ResumesPage() {
                 <div className="col-span-3 truncate font-medium text-zinc-900">
                   {it.name || [it.first_name, it.last_name].filter(Boolean).join(' ') || '未命名'}
                 </div>
-                <div className="col-span-2 truncate text-zinc-700">
-                  {[it.country, it.city].filter(Boolean).join(' / ') || '-'}
-                </div>
-                <div className="col-span-3 truncate text-zinc-700">
-                  <div className="flex items-center gap-2">
-                    <span className={it.email ? 'text-emerald-700' : 'text-zinc-400'}>E</span>
-                    <span className={it.whatsapp ? 'text-emerald-700' : 'text-zinc-400'}>W</span>
-                    <span className={it.phone ? 'text-emerald-700' : 'text-zinc-400'}>P</span>
+                <div className="col-span-1 truncate text-zinc-700">{it.country || '-'}</div>
+                <div className="col-span-2">
+                  <div className="flex items-center gap-1">
+                    <span
+                      className={cn(
+                        'rounded-md px-1.5 py-0.5 text-[11px] font-medium',
+                        it.email ? 'bg-emerald-50 text-emerald-700' : 'bg-zinc-100 text-zinc-400',
+                      )}
+                    >
+                      Email
+                    </span>
+                    <span
+                      className={cn(
+                        'rounded-md px-1.5 py-0.5 text-[11px] font-medium',
+                        it.whatsapp ? 'bg-emerald-50 text-emerald-700' : 'bg-zinc-100 text-zinc-400',
+                      )}
+                    >
+                      WA
+                    </span>
+                    <span
+                      className={cn(
+                        'rounded-md px-1.5 py-0.5 text-[11px] font-medium',
+                        it.phone ? 'bg-emerald-50 text-emerald-700' : 'bg-zinc-100 text-zinc-400',
+                      )}
+                    >
+                      Phone
+                    </span>
                   </div>
                 </div>
-                <div className="col-span-1 text-zinc-700">{it.work_years ?? '-'}</div>
-                <div className="col-span-2 flex items-center gap-2">
+                <div className="col-span-2">
+                  <input
+                    value={draftDirection[it.id] ?? ''}
+                    onChange={(e) => setDraftDirection((d) => ({ ...d, [it.id]: e.target.value.slice(0, 60) }))}
+                    onBlur={() => void save(it.id, { job_direction: (draftDirection[it.id] || '').trim() || null })}
+                    className="w-full rounded-md border border-zinc-200 bg-white px-2 py-1 text-sm"
+                  />
+                </div>
+                <div className="col-span-2">
+                  <input
+                    value={draftNote[it.id] ?? ''}
+                    onChange={(e) => setDraftNote((d) => ({ ...d, [it.id]: e.target.value.slice(0, 20) }))}
+                    onBlur={() => void save(it.id, { admin_note: (draftNote[it.id] || '').trim() || null })}
+                    maxLength={20}
+                    className="w-full rounded-md border border-zinc-200 bg-white px-2 py-1 text-sm"
+                  />
+                </div>
+                <div className="col-span-1 flex items-center justify-between gap-2">
                   <StatusBadge status={it.parse_status} />
-                  {it.parse_status === 'failed' && it.parse_error ? (
-                    <span className="truncate text-xs text-red-700">{it.parse_error}</span>
-                  ) : null}
+                  {saving[it.id] ? <span className="text-xs text-zinc-400">…</span> : null}
                 </div>
                 <div className="col-span-1 text-right">
                   <Link

@@ -1,39 +1,17 @@
-import { z } from 'zod'
-
-const EducationItemSchema = z
-  .object({
-    school: z.string().trim().min(1).max(200).optional().nullable(),
-    degree: z.string().trim().min(1).max(200).optional().nullable(),
-    major: z.string().trim().min(1).max(200).optional().nullable(),
-    startDate: z.string().trim().min(1).max(50).optional().nullable(),
-    endDate: z.string().trim().min(1).max(50).optional().nullable(),
-    raw: z.string().trim().min(1).max(500).optional().nullable(),
-  })
-  .strict()
-
-const ExtractResultSchema = z
-  .object({
-    full_name: z.string().trim().min(1).max(120).optional().nullable(),
-    first_name: z.string().trim().min(1).max(80).optional().nullable(),
-    last_name: z.string().trim().min(1).max(80).optional().nullable(),
-    country: z.string().trim().min(1).max(80).optional().nullable(),
-    city: z.string().trim().min(1).max(80).optional().nullable(),
-    email: z.string().trim().min(1).max(200).optional().nullable(),
-    whatsapp: z.string().trim().min(1).max(80).optional().nullable(),
-    phone: z.string().trim().min(1).max(80).optional().nullable(),
-    work_years: z.number().int().min(0).max(60).optional().nullable(),
-    education: z.array(EducationItemSchema).max(12).optional().nullable(),
-    intro_summary_original: z.string().trim().min(1).max(900).optional().nullable(),
-    intro_language: z.string().trim().min(2).max(12).optional().nullable(),
-  })
-  .strict()
-
-const BodySchema = z
-  .object({
-    text: z.string().min(1).max(30000),
-    filename: z.string().max(260).optional(),
-  })
-  .strict()
+type ExtractResult = {
+  full_name?: string | null
+  first_name?: string | null
+  last_name?: string | null
+  country?: string | null
+  city?: string | null
+  email?: string | null
+  whatsapp?: string | null
+  phone?: string | null
+  work_years?: number | null
+  education?: unknown[] | null
+  intro_summary_original?: string | null
+  intro_language?: string | null
+}
 
 function json(data: unknown, init?: { status?: number }) {
   return new Response(JSON.stringify(data), {
@@ -51,6 +29,37 @@ function pickJsonObject(s: string) {
   return s.slice(start, end + 1)
 }
 
+function asString(v: unknown, max = 500) {
+  if (typeof v !== 'string') return null
+  const t = v.trim()
+  if (!t) return null
+  return t.slice(0, max)
+}
+
+function asNumberInt(v: unknown, min: number, max: number) {
+  if (typeof v !== 'number' || !Number.isFinite(v)) return null
+  const n = Math.trunc(v)
+  if (n < min || n > max) return null
+  return n
+}
+
+function normalizeResult(obj: any): ExtractResult {
+  const out: ExtractResult = {}
+  out.full_name = asString(obj?.full_name, 120)
+  out.first_name = asString(obj?.first_name, 80)
+  out.last_name = asString(obj?.last_name, 80)
+  out.country = asString(obj?.country, 80)
+  out.city = asString(obj?.city, 80)
+  out.email = asString(obj?.email, 200)
+  out.whatsapp = asString(obj?.whatsapp, 80)
+  out.phone = asString(obj?.phone, 80)
+  out.work_years = asNumberInt(obj?.work_years, 0, 60)
+  out.intro_summary_original = asString(obj?.intro_summary_original, 900)
+  out.intro_language = asString(obj?.intro_language, 12)
+  out.education = Array.isArray(obj?.education) ? obj.education.slice(0, 12) : null
+  return out
+}
+
 export async function onRequestOptions() {
   return new Response(null, {
     status: 204,
@@ -61,6 +70,14 @@ export async function onRequestOptions() {
       'Access-Control-Max-Age': '86400',
     },
   })
+}
+
+export async function onRequestGet(context: { env: Record<string, string | undefined> }) {
+  const { env } = context
+  const baseUrl = env.LLM_BASE_URL || null
+  const model = env.LLM_MODEL || 'gpt-4o-mini'
+  const configured = Boolean(env.LLM_API_KEY && env.LLM_BASE_URL)
+  return json({ success: true, configured, meta: { model, base_url: baseUrl } })
 }
 
 export async function onRequestPost(context: { request: Request; env: Record<string, string | undefined> }) {
@@ -88,12 +105,12 @@ export async function onRequestPost(context: { request: Request; env: Record<str
     return json({ success: false, error: 'Invalid JSON body' }, { status: 400 })
   }
 
-  const parsed = BodySchema.safeParse(bodyRaw)
-  if (!parsed.success) {
+  const anyBody = bodyRaw as any
+  const text = typeof anyBody?.text === 'string' ? anyBody.text : ''
+  const filename = typeof anyBody?.filename === 'string' ? anyBody.filename : ''
+  if (!text.trim() || text.length > 30000) {
     return json({ success: false, error: 'Invalid request body' }, { status: 400 })
   }
-
-  const { text, filename } = parsed.data
 
   const system =
     'You are a resume parsing engine. Extract only information explicitly supported by the resume text. Do not guess. Output ONLY valid JSON, no markdown.'
@@ -151,14 +168,9 @@ export async function onRequestPost(context: { request: Request; env: Record<str
     return json({ success: false, error: 'Failed to parse LLM JSON' }, { status: 502 })
   }
 
-  const validated = ExtractResultSchema.safeParse(obj)
-  if (!validated.success) {
-    return json({ success: false, error: 'LLM JSON does not match schema' }, { status: 502 })
-  }
-
   return json({
     success: true,
-    data: validated.data,
+    data: normalizeResult(obj as any),
     meta: {
       model,
       base_url: baseUrl,

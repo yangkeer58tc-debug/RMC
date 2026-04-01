@@ -12,7 +12,7 @@ export default function IntroSummaryCard({
   return (
     <div className="rounded-lg border border-zinc-200 bg-white p-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-sm font-semibold text-zinc-900">个人总结（AI生成）</h2>
+        <h2 className="text-sm font-semibold text-zinc-900">个人总结（AI生成，原语言）</h2>
         <button
           type="button"
           onClick={async () => {

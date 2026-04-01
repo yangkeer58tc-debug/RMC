@@ -136,7 +136,7 @@ export async function importResumeUpload(file: File, opts?: ImportOpts) {
       }
 
       ;(parsed as any).profileSummary = pickFirst(ai.profile_summary, (parsed as any).profileSummary) || undefined
-      ;(parsed as any).profileSummaryLanguage = pickFirst(ai.profile_summary_language, 'zh') || undefined
+      ;(parsed as any).profileSummaryLanguage = pickFirst(ai.profile_summary_language, parsed.introLanguage) || undefined
 
       const inferred = inferNameParts(parsed.name)
       ;(parsed as any).firstName = pickFirst(ai.first_name, inferred.first_name) || undefined
@@ -282,7 +282,7 @@ export async function importResumeUrl(url: string, opts?: ImportOpts) {
       }
 
       ;(parsed as any).profileSummary = pickFirst(ai.profile_summary, (parsed as any).profileSummary) || undefined
-      ;(parsed as any).profileSummaryLanguage = pickFirst(ai.profile_summary_language, 'zh') || undefined
+      ;(parsed as any).profileSummaryLanguage = pickFirst(ai.profile_summary_language, parsed.introLanguage) || undefined
 
       const inferred = inferNameParts(parsed.name)
       ;(parsed as any).firstName = pickFirst(ai.first_name, inferred.first_name) || undefined
@@ -458,7 +458,7 @@ export async function reparseResume(id: string) {
       }
 
       ;(parsed as any).profileSummary = pickFirst(ai.profile_summary, (parsed as any).profileSummary) || undefined
-      ;(parsed as any).profileSummaryLanguage = pickFirst(ai.profile_summary_language, 'zh') || undefined
+      ;(parsed as any).profileSummaryLanguage = pickFirst(ai.profile_summary_language, parsed.introLanguage) || undefined
 
       const inferred = inferNameParts(parsed.name)
       ;(parsed as any).firstName = pickFirst(ai.first_name, inferred.first_name) || undefined

@@ -105,6 +105,16 @@ function mergeEducation(aiEdu: unknown, parsedEdu: unknown) {
   })
 }
 
+function chooseWorkYears(aiWorkYears: unknown, heuristic: number | null | undefined) {
+  const ai = typeof aiWorkYears === 'number' && Number.isFinite(aiWorkYears) ? Math.trunc(aiWorkYears) : null
+  const h = typeof heuristic === 'number' && Number.isFinite(heuristic) ? Math.trunc(heuristic) : null
+  if (ai === null) return h
+  if (ai < 0 || ai > 60) return h
+  if (h === null) return ai
+  if (Math.abs(ai - h) <= 2) return ai
+  return h
+}
+
 function normalizeExt(name: string) {
   const lower = name.toLowerCase()
   if (lower.endsWith('.pdf')) return 'pdf'
@@ -134,6 +144,7 @@ export async function importResumeUpload(file: File, opts?: ImportOpts) {
   let parse_error: string | null = null
   let text_content: string | null = null
   let parsed: ReturnType<typeof parseResumeText> = {}
+  let heuristicWorkYears: number | null | undefined
 
   try {
     opts?.onProgress?.('解析中…')
@@ -146,6 +157,7 @@ export async function importResumeUpload(file: File, opts?: ImportOpts) {
     }
     text_content = await extractTextFromFile(file, extractOpts)
     parsed = parseResumeText(text_content)
+    heuristicWorkYears = parsed.workYears
 
     opts?.onProgress?.('AI 抽取中…')
     const aiRes = await aiExtract(text_content, file.name)
@@ -169,7 +181,7 @@ export async function importResumeUpload(file: File, opts?: ImportOpts) {
         email: pickFirst(ai.email, parsed.email) || undefined,
         whatsapp: pickFirst(ai.whatsapp, parsed.whatsapp) || undefined,
         phone: pickFirst(ai.phone, parsed.phone) || undefined,
-        workYears: (ai.work_years ?? parsed.workYears) ?? undefined,
+        workYears: chooseWorkYears(ai.work_years, parsed.workYears) ?? undefined,
         education: mergeEducation(ai.education, parsed.education) ?? undefined,
         introSummaryOriginal: pickFirst(ai.intro_summary_original, parsed.introSummaryOriginal) || undefined,
         introLanguage: pickFirst(ai.intro_language, parsed.introLanguage) || undefined,
@@ -315,7 +327,7 @@ export async function importResumeUrl(url: string, opts?: ImportOpts) {
         email: pickFirst(ai.email, parsed.email) || undefined,
         whatsapp: pickFirst(ai.whatsapp, parsed.whatsapp) || undefined,
         phone: pickFirst(ai.phone, parsed.phone) || undefined,
-        workYears: (ai.work_years ?? parsed.workYears) ?? undefined,
+        workYears: chooseWorkYears(ai.work_years, parsed.workYears) ?? undefined,
         education: mergeEducation(ai.education, parsed.education) ?? undefined,
         introSummaryOriginal: pickFirst(ai.intro_summary_original, parsed.introSummaryOriginal) || undefined,
         introLanguage: pickFirst(ai.intro_language, parsed.introLanguage) || undefined,
@@ -491,7 +503,7 @@ export async function reparseResume(id: string) {
         email: pickFirst(ai.email, parsed.email) || undefined,
         whatsapp: pickFirst(ai.whatsapp, parsed.whatsapp) || undefined,
         phone: pickFirst(ai.phone, parsed.phone) || undefined,
-        workYears: (ai.work_years ?? parsed.workYears) ?? undefined,
+        workYears: chooseWorkYears(ai.work_years, parsed.workYears) ?? undefined,
         education: mergeEducation(ai.education, parsed.education) ?? undefined,
         introSummaryOriginal: pickFirst(ai.intro_summary_original, parsed.introSummaryOriginal) || undefined,
         introLanguage: pickFirst(ai.intro_language, parsed.introLanguage) || undefined,

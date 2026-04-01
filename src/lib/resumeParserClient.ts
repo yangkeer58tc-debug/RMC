@@ -223,7 +223,7 @@ function buildIntroSummary(text: string) {
 }
 
 function extractEducation(text: string): EducationItem[] | undefined {
-  const section = findSection(text, [/^Education\b/i, /^教育经历/, /^教育背景/])
+  const section = findSection(text, [/^Education\b/i, /^教育经历/, /^教育背景/, /^Forma\w+\b/i])
   if (!section) return undefined
   const lines = section
     .split('\n')
@@ -232,8 +232,20 @@ function extractEducation(text: string): EducationItem[] | undefined {
   const items: EducationItem[] = []
   for (const line of lines) {
     if (items.length >= 8) break
+    const onlyYears = line.match(/^(?:de\s*)?((?:19|20)\d{2})\s*(?:a|até|–|—|-|to)\s*((?:19|20)\d{2})$/i)
+    if (onlyYears && items.length) {
+      const last = items[items.length - 1]
+      if (last && !last.startDate && !last.endDate) {
+        last.startDate = onlyYears[1]
+        last.endDate = onlyYears[2]
+        continue
+      }
+    }
+
     const degree = /(BSc|MSc|PhD|Bachelor|Master|Doctor|本科|硕士|博士|学士|研究生)/i.test(line) ? line : undefined
-    const years = line.match(/((?:19|20)\d{2}).{0,6}((?:19|20)\d{2})/)
+    const years =
+      line.match(/((?:19|20)\d{2}).{0,6}((?:19|20)\d{2})/) ||
+      line.match(/(?:de\s*)?((?:19|20)\d{2})\s*(?:a|até|–|—|-|to)\s*((?:19|20)\d{2})/i)
     const startDate = years?.[1]
     const endDate = years?.[2]
     items.push({ degree: degree || line, startDate, endDate, raw: line })

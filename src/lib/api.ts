@@ -135,6 +135,9 @@ export async function importResumeUpload(file: File, opts?: ImportOpts) {
         introLanguage: pickFirst(ai.intro_language, parsed.introLanguage) || undefined,
       }
 
+      ;(parsed as any).profileSummary = pickFirst(ai.profile_summary, (parsed as any).profileSummary) || undefined
+      ;(parsed as any).profileSummaryLanguage = pickFirst(ai.profile_summary_language, 'zh') || undefined
+
       const inferred = inferNameParts(parsed.name)
       ;(parsed as any).firstName = pickFirst(ai.first_name, inferred.first_name) || undefined
       ;(parsed as any).lastName = pickFirst(ai.last_name, inferred.last_name) || undefined
@@ -168,10 +171,12 @@ export async function importResumeUpload(file: File, opts?: ImportOpts) {
     email: parsed.email || null,
     whatsapp: parsed.whatsapp || null,
     phone: parsed.phone || null,
-    work_years: parsed.workYears ?? null,
+    work_years: parsed.workYears ?? 0,
     education: parsed.education ?? null,
     intro_summary_original: parsed.introSummaryOriginal || null,
     intro_language: parsed.introLanguage || null,
+    profile_summary: ((parsed as any).profileSummary as string | undefined) || null,
+    profile_summary_language: ((parsed as any).profileSummaryLanguage as string | undefined) || null,
     ai_used: ((parsed as any).aiUsed as boolean | undefined) || false,
     ai_model: ((parsed as any).aiModel as string | null | undefined) || null,
     ai_error: ((parsed as any).aiError as string | null | undefined) || null,
@@ -276,6 +281,9 @@ export async function importResumeUrl(url: string, opts?: ImportOpts) {
         introLanguage: pickFirst(ai.intro_language, parsed.introLanguage) || undefined,
       }
 
+      ;(parsed as any).profileSummary = pickFirst(ai.profile_summary, (parsed as any).profileSummary) || undefined
+      ;(parsed as any).profileSummaryLanguage = pickFirst(ai.profile_summary_language, 'zh') || undefined
+
       const inferred = inferNameParts(parsed.name)
       ;(parsed as any).firstName = pickFirst(ai.first_name, inferred.first_name) || undefined
       ;(parsed as any).lastName = pickFirst(ai.last_name, inferred.last_name) || undefined
@@ -309,10 +317,12 @@ export async function importResumeUrl(url: string, opts?: ImportOpts) {
     email: parsed.email || null,
     whatsapp: parsed.whatsapp || null,
     phone: parsed.phone || null,
-    work_years: parsed.workYears ?? null,
+    work_years: parsed.workYears ?? 0,
     education: parsed.education ?? null,
     intro_summary_original: parsed.introSummaryOriginal || null,
     intro_language: parsed.introLanguage || null,
+    profile_summary: ((parsed as any).profileSummary as string | undefined) || null,
+    profile_summary_language: ((parsed as any).profileSummaryLanguage as string | undefined) || null,
     ai_used: ((parsed as any).aiUsed as boolean | undefined) || false,
     ai_model: ((parsed as any).aiModel as string | null | undefined) || null,
     ai_error: ((parsed as any).aiError as string | null | undefined) || null,
@@ -378,6 +388,8 @@ export async function updateResume(id: string, patch: Partial<ResumeDetail>) {
     'work_years',
     'education',
     'intro_summary_original',
+    'profile_summary',
+    'profile_summary_language',
   ]
   for (const k of allowed) {
     if (k in patch) body[k] = (patch as Record<string, unknown>)[k]
@@ -445,6 +457,9 @@ export async function reparseResume(id: string) {
         introLanguage: pickFirst(ai.intro_language, parsed.introLanguage) || undefined,
       }
 
+      ;(parsed as any).profileSummary = pickFirst(ai.profile_summary, (parsed as any).profileSummary) || undefined
+      ;(parsed as any).profileSummaryLanguage = pickFirst(ai.profile_summary_language, 'zh') || undefined
+
       const inferred = inferNameParts(parsed.name)
       ;(parsed as any).firstName = pickFirst(ai.first_name, inferred.first_name) || undefined
       ;(parsed as any).lastName = pickFirst(ai.last_name, inferred.last_name) || undefined
@@ -468,10 +483,12 @@ export async function reparseResume(id: string) {
     email: parsed.email || null,
     whatsapp: parsed.whatsapp || null,
     phone: parsed.phone || null,
-    work_years: parsed.workYears ?? null,
+    work_years: parsed.workYears ?? 0,
     education: parsed.education ?? null,
     intro_summary_original: parsed.introSummaryOriginal || null,
     intro_language: parsed.introLanguage || null,
+    profile_summary: ((parsed as any).profileSummary as string | undefined) || null,
+    profile_summary_language: ((parsed as any).profileSummaryLanguage as string | undefined) || null,
     ai_used: ((parsed as any).aiUsed as boolean | undefined) || false,
     ai_model: ((parsed as any).aiModel as string | null | undefined) || null,
     ai_error: ((parsed as any).aiError as string | null | undefined) || null,

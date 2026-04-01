@@ -9,7 +9,7 @@ type Tab = 'upload' | 'url'
 export default function ImportPage() {
   const nav = useNavigate()
   const [tab, setTab] = useState<Tab>('upload')
-  const [file, setFile] = useState<File | null>(null)
+  const [files, setFiles] = useState<File[]>([])
   const [url, setUrl] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -17,21 +17,27 @@ export default function ImportPage() {
 
   const canSubmit = useMemo(() => {
     if (busy) return false
-    if (tab === 'upload') return !!file
+    if (tab === 'upload') return files.length > 0
     return !!url.trim()
-  }, [busy, tab, file, url])
+  }, [busy, tab, files, url])
 
   async function onSubmit() {
     setError(null)
     setProgress(null)
     setBusy(true)
     try {
-      const data =
-        tab === 'upload'
-          ? await importResumeUpload(file as File, { onProgress: setProgress })
-          : await importResumeUrl(url.trim(), { onProgress: setProgress })
-
-      nav(`/resumes/${data.resumeId}`)
+      if (tab === 'upload') {
+        for (let i = 0; i < files.length; i++) {
+          const f = files[i] as File
+          await importResumeUpload(f, {
+            onProgress: (msg) => setProgress(`(${i + 1}/${files.length}) ${f.name} · ${msg}`),
+          })
+        }
+        nav('/resumes')
+      } else {
+        const data = await importResumeUrl(url.trim(), { onProgress: setProgress })
+        nav(`/resumes/${data.resumeId}`)
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : '导入失败')
     } finally {
@@ -79,17 +85,16 @@ export default function ImportPage() {
           <div className="mt-4">
             {tab === 'upload' ? (
               <div className="space-y-3">
-                <label className="block text-sm font-medium text-zinc-800">选择文件（PDF / DOCX / TXT）</label>
+                <label className="block text-sm font-medium text-zinc-800">选择文件（PDF / DOCX / TXT，可多选）</label>
                 <input
                   type="file"
+                  multiple
                   accept=".pdf,.docx,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain"
-                  onChange={(e) => setFile(e.target.files?.[0] || null)}
+                  onChange={(e) => setFiles(Array.from(e.target.files || []))}
                   className="block w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm"
                 />
-                {file ? (
-                  <div className="text-xs text-zinc-600">
-                    已选择：{file.name}（{Math.ceil(file.size / 1024)} KB）
-                  </div>
+                {files.length ? (
+                  <div className="text-xs text-zinc-600">已选择 {files.length} 个文件</div>
                 ) : null}
               </div>
             ) : (

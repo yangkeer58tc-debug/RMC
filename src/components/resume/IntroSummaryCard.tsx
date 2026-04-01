@@ -12,11 +12,11 @@ export default function IntroSummaryCard({
   return (
     <div className="rounded-lg border border-zinc-200 bg-white p-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-sm font-semibold text-zinc-900">自我介绍摘要（原语言）</h2>
+        <h2 className="text-sm font-semibold text-zinc-900">个人总结（AI生成）</h2>
         <button
           type="button"
           onClick={async () => {
-            const text = effective.intro_summary_original || ''
+            const text = effective.profile_summary || ''
             if (!text) return
             await navigator.clipboard.writeText(text)
           }}
@@ -26,15 +26,14 @@ export default function IntroSummaryCard({
         </button>
       </div>
       <textarea
-        value={effective.intro_summary_original || ''}
-        onChange={(e) => setField('intro_summary_original', e.target.value || null)}
+        value={effective.profile_summary || ''}
+        onChange={(e) => setField('profile_summary', e.target.value || null)}
         rows={6}
         className="mt-3 w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm"
       />
-      {item.intro_language ? (
-        <div className="mt-2 text-xs text-zinc-500">语言识别：{item.intro_language}</div>
+      {item.profile_summary_language ? (
+        <div className="mt-2 text-xs text-zinc-500">语言：{item.profile_summary_language}</div>
       ) : null}
     </div>
   )
 }
-

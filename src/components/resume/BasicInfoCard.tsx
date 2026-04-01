@@ -32,19 +32,12 @@ export default function BasicInfoCard({
             className="w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm"
           />
         </Field>
-        <Field label="姓名">
-          <input
-            value={effective.name || ''}
-            onChange={(e) => setField('name', e.target.value || null)}
-            className="w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm"
-          />
-        </Field>
         <Field label="工作年限">
           <input
-            value={effective.work_years ?? ''}
+            value={String(effective.work_years ?? 0)}
             onChange={(e) => {
               const v = e.target.value.trim()
-              if (!v) setField('work_years', null)
+              if (!v) setField('work_years', 0)
               else setField('work_years', Number(v))
             }}
             inputMode="numeric"

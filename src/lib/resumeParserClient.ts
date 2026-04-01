@@ -7,9 +7,7 @@ import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker?url'
 GlobalWorkerOptions.workerSrc = pdfWorkerUrl
 
 export type EducationItem = {
-  school?: string
   degree?: string
-  major?: string
   startDate?: string
   endDate?: string
   raw?: string
@@ -223,10 +221,11 @@ function extractEducation(text: string): EducationItem[] | undefined {
   const items: EducationItem[] = []
   for (const line of lines) {
     if (items.length >= 8) break
-    const parts = line.split(/[,，|]/).map((p) => p.trim()).filter(Boolean)
-    const school = parts[0]
-    const degree = parts.find((p) => /(BSc|MSc|PhD|Bachelor|Master|Doctor|本科|硕士|博士|学士|研究生)/i.test(p))
-    items.push({ school, degree, raw: line })
+    const degree = /(BSc|MSc|PhD|Bachelor|Master|Doctor|本科|硕士|博士|学士|研究生)/i.test(line) ? line : undefined
+    const years = line.match(/((?:19|20)\d{2}).{0,6}((?:19|20)\d{2})/)
+    const startDate = years?.[1]
+    const endDate = years?.[2]
+    items.push({ degree: degree || line, startDate, endDate, raw: line })
   }
   return items.length ? items : undefined
 }

@@ -2,9 +2,7 @@ export type ParseStatus = 'processing' | 'success' | 'failed'
 export type SourceType = 'upload' | 'url'
 
 export type EducationItem = {
-  school?: string
   degree?: string
-  major?: string
   startDate?: string
   endDate?: string
   raw?: string
@@ -25,6 +23,8 @@ export type ResumeListItem = {
   ai_model: string | null
   ai_error: string | null
   ai_extracted_at: string | null
+  profile_summary: string | null
+  profile_summary_language: string | null
   parse_status: ParseStatus
   parse_error: string | null
   created_at: string

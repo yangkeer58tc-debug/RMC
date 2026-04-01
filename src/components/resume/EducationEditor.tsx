@@ -14,7 +14,7 @@ export default function EducationEditor({
         <h2 className="text-sm font-semibold text-zinc-900">教育经历</h2>
         <button
           type="button"
-          onClick={() => setEducation([...education, { school: '', degree: '', major: '' }])}
+          onClick={() => setEducation([...education, { degree: '', startDate: '', endDate: '' }])}
           className="rounded-md bg-zinc-100 px-2 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-200"
         >
           添加
@@ -25,17 +25,6 @@ export default function EducationEditor({
           education.map((e, idx) => (
             <div key={idx} className="rounded-md border border-zinc-200 p-3">
               <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-                <Field label="学校">
-                  <input
-                    value={e.school || ''}
-                    onChange={(ev) =>
-                      setEducation(
-                        education.map((x, i) => (i === idx ? { ...x, school: ev.target.value } : x)),
-                      )
-                    }
-                    className="w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm"
-                  />
-                </Field>
                 <Field label="学位">
                   <input
                     value={e.degree || ''}
@@ -47,14 +36,25 @@ export default function EducationEditor({
                     className="w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm"
                   />
                 </Field>
-                <Field label="专业">
+                <Field label="起始年份">
                   <input
-                    value={e.major || ''}
+                    value={e.startDate || ''}
                     onChange={(ev) =>
                       setEducation(
-                        education.map((x, i) => (i === idx ? { ...x, major: ev.target.value } : x)),
+                        education.map((x, i) => (i === idx ? { ...x, startDate: ev.target.value } : x)),
                       )
                     }
+                    inputMode="numeric"
+                    className="w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm"
+                  />
+                </Field>
+                <Field label="结束年份">
+                  <input
+                    value={e.endDate || ''}
+                    onChange={(ev) =>
+                      setEducation(education.map((x, i) => (i === idx ? { ...x, endDate: ev.target.value } : x)))
+                    }
+                    inputMode="numeric"
                     className="w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm"
                   />
                 </Field>

@@ -11,6 +11,8 @@ type ExtractResult = {
   education?: unknown[] | null
   intro_summary_original?: string | null
   intro_language?: string | null
+  profile_summary?: string | null
+  profile_summary_language?: string | null
 }
 
 function json(data: unknown, init?: { status?: number }) {
@@ -57,6 +59,8 @@ function normalizeResult(obj: any): ExtractResult {
   out.intro_summary_original = asString(obj?.intro_summary_original, 900)
   out.intro_language = asString(obj?.intro_language, 12)
   out.education = Array.isArray(obj?.education) ? obj.education.slice(0, 12) : null
+  out.profile_summary = asString(obj?.profile_summary, 1200)
+  out.profile_summary_language = asString(obj?.profile_summary_language, 12)
   return out
 }
 
@@ -117,14 +121,15 @@ export async function onRequestPost(context: { request: Request; env: Record<str
   const user =
     `Resume filename: ${filename || ''}\n` +
     `Resume text:\n${text}\n\n` +
-    'Return JSON with keys: full_name, first_name, last_name, country, city, email, whatsapp, phone, work_years, education, intro_summary_original, intro_language. Use null when unknown.\n' +
+    'Return JSON with keys: full_name, first_name, last_name, country, city, email, whatsapp, phone, work_years, education, intro_summary_original, intro_language, profile_summary, profile_summary_language. Use null when unknown.\n' +
     '- full_name should be the display name.\n' +
     '- first_name/last_name should be split if possible.\n' +
     '- country should be a country name (e.g., United Arab Emirates) or ISO-2 if clearly present; do not guess.\n' +
     '- city should be the city part of location if present; do not guess.\n' +
     '- work_years MUST be derived from explicit date ranges in the text; use current year for Present; if ranges are missing, return null.\n' +
     '- For OCR text, prioritize lines near headings like NAME/CONTACT/LOCATION/ABOUT/EXPERIENCE.\n' +
-    '- intro_summary_original must keep the resume original language.'
+    '- intro_summary_original must keep the resume original language.\n' +
+    '- profile_summary MUST be a recruiter-facing summary written in Simplified Chinese, 200-400 Chinese characters, based on the resume; do NOT directly copy long sentences; do not invent facts; include role, seniority, key skills, domain, location if present. Set profile_summary_language to "zh".'
 
   const base = baseUrl.replace(/\/$/, '')
   const url = base.endsWith('/v1') ? base + '/chat/completions' : base + '/v1/chat/completions'

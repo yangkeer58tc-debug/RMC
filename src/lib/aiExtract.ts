@@ -11,6 +11,8 @@ export type AiExtractResult = {
   education?: unknown[] | null
   intro_summary_original?: string | null
   intro_language?: string | null
+  profile_summary?: string | null
+  profile_summary_language?: string | null
 }
 
 export type AiExtractMeta = {

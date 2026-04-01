@@ -112,6 +112,17 @@ function extractLocation(text: string) {
       if (parts.length === 2) return { city: parts[0], country: parts[1] }
       return { city: v }
     }
+
+    const mPt = l.match(/^(?:Localiza\w+|Local|Cidade|País)\s*[:：]\s*(.+)$/i)
+    if (mPt?.[1]) {
+      const v = mPt[1].trim()
+      const parts = v.split(/[,，\-–—/|]+/).map((p) => p.trim()).filter(Boolean)
+      if (/^país$/i.test(l.split(/[:：]/)[0] || '')) return { country: v }
+      if (/^cidade$/i.test(l.split(/[:：]/)[0] || '')) return { city: v }
+      if (parts.length >= 3) return { city: parts[parts.length - 2], country: parts[parts.length - 1] }
+      if (parts.length === 2) return { city: parts[0], country: parts[1] }
+      return { city: v }
+    }
   }
 
   for (const l of lines.slice(0, 12)) {
@@ -124,14 +135,17 @@ function extractLocation(text: string) {
 }
 
 function extractWorkYears(text: string) {
+  const expText =
+    findSection(text, [/^Work Experience\b/i, /^Experience\b/i, /^Experi\w+\b/i, /^工作经历/, /^工作经验/]) || text
+
   const candidates: number[] = []
-  for (const m of text.matchAll(/(\d{1,2})(?:\s*\+)?\s*(?:years?|yrs?)\b/gi)) {
+  for (const m of expText.matchAll(/(\d{1,2})(?:\s*\+)?\s*(?:years?|yrs?)\b/gi)) {
     candidates.push(Number(m[1]))
   }
-  for (const m of text.matchAll(/(?:工作|从业|经验)\s*(\d{1,2})\s*年/gi)) {
+  for (const m of expText.matchAll(/(?:工作|从业|经验)\s*(\d{1,2})\s*年/gi)) {
     candidates.push(Number(m[1]))
   }
-  for (const m of text.matchAll(/(\d{1,2})\s*年(?:以上)?(?:工作)?经验/gi)) {
+  for (const m of expText.matchAll(/(\d{1,2})\s*年(?:以上)?(?:工作)?经验/gi)) {
     candidates.push(Number(m[1]))
   }
   if (candidates.length) return Math.max(...candidates)
@@ -142,7 +156,7 @@ function extractWorkYears(text: string) {
 
   const rangeRe = /((?:19|20)\d{2})\s*(?:–|—|-|to)\s*(present|now|current|((?:19|20)\d{2}))/gi
   const rangeRePt = /(de\s*)?((?:19|20)\d{2})\s*(?:a|até|–|—|-|to)\s*(present|atual|hoje|now|current|((?:19|20)\d{2}))/gi
-  for (const m of text.matchAll(rangeRe)) {
+  for (const m of expText.matchAll(rangeRe)) {
     const start = Number(m[1])
     const end = m[2] ? nowYear : Number(m[3])
     if (Number.isNaN(start) || Number.isNaN(end)) continue
@@ -152,7 +166,7 @@ function extractWorkYears(text: string) {
     maxEnd = maxEnd === null ? end : Math.max(maxEnd, end)
   }
 
-  for (const m of text.matchAll(rangeRePt)) {
+  for (const m of expText.matchAll(rangeRePt)) {
     const start = Number(m[2])
     const end = m[3] && /present|atual|hoje|now|current/i.test(m[3]) ? nowYear : Number(m[4])
     if (Number.isNaN(start) || Number.isNaN(end)) continue

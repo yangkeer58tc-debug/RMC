@@ -88,14 +88,23 @@ function normalizeEducationAny(input: unknown) {
   return items.length ? items : null
 }
 
+function eduKey(v: string) {
+  return v
+    .toLowerCase()
+    .replace(/(19|20)\d{2}/g, ' ')
+    .replace(/[^\p{L}\p{N}]+/gu, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
 function mergeEducation(aiEdu: unknown, parsedEdu: unknown) {
   const ai = normalizeEducationAny(aiEdu)
   const parsed = normalizeEducationAny(parsedEdu)
   if (!ai) return parsed
   if (!parsed) return ai
   return ai.map((a) => {
-    const key = (a.degree || a.raw || '').toLowerCase()
-    const p = parsed.find((x) => ((x.degree || x.raw || '').toLowerCase() === key))
+    const key = eduKey(a.degree || a.raw || '')
+    const p = parsed.find((x) => eduKey(x.degree || x.raw || '') === key)
     return {
       degree: a.degree || p?.degree,
       startDate: a.startDate || p?.startDate,
@@ -144,7 +153,6 @@ export async function importResumeUpload(file: File, opts?: ImportOpts) {
   let parse_error: string | null = null
   let text_content: string | null = null
   let parsed: ReturnType<typeof parseResumeText> = {}
-  let heuristicWorkYears: number | null | undefined
 
   try {
     opts?.onProgress?.('解析中…')
@@ -157,7 +165,6 @@ export async function importResumeUpload(file: File, opts?: ImportOpts) {
     }
     text_content = await extractTextFromFile(file, extractOpts)
     parsed = parseResumeText(text_content)
-    heuristicWorkYears = parsed.workYears
 
     opts?.onProgress?.('AI 抽取中…')
     const aiRes = await aiExtract(text_content, file.name)

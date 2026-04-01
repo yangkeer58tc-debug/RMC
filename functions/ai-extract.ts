@@ -139,7 +139,7 @@ export async function onRequestPost(context: { request: Request; env: Record<str
     '- first_name/last_name should be split if possible.\n' +
     '- country should be a country name (e.g., United Arab Emirates) or ISO-2 if clearly present; do not guess.\n' +
     '- city should be the city part of location if present; do not guess.\n' +
-    '- work_years MUST be derived from explicit date ranges in the text; use current year for Present; if ranges are missing, return null.\n' +
+    '- work_years MUST be derived from explicit date ranges in the WORK EXPERIENCE/EXPERIENCE section only (ignore EDUCATION years); use current year for Present; if ranges are missing, return null.\n' +
     '- For OCR text, prioritize lines near headings like NAME/CONTACT/LOCATION/ABOUT/EXPERIENCE.\n' +
     '- intro_summary_original must keep the resume original language.\n' +
     '- profile_summary MUST be a recruiter-facing summary in the SAME language as the resume, 200-400 words (or 200-400 CJK characters if the resume is in Chinese/Japanese/Korean); do NOT directly copy long sentences; do not invent facts; include role, seniority, key skills, domain, location if present. It must end with a complete sentence. Set profile_summary_language to the language code (e.g., en, pt, fr, zh).'

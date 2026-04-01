@@ -309,13 +309,15 @@ async function ocrPdf(arrayBuffer: ArrayBuffer, opts?: ExtractOptions) {
 export async function extractTextFromFile(file: File, opts?: ExtractOptions): Promise<string> {
   const lower = file.name.toLowerCase()
   if (lower.endsWith('.pdf')) {
-    const buf = await file.arrayBuffer()
-    const plain = (await extractTextFromPdf(buf)).trim()
+    const original = await file.arrayBuffer()
+    const bufForText = original.slice(0)
+    const bufForOcr = original.slice(0)
+    const plain = (await extractTextFromPdf(bufForText)).trim()
     if (plain.length >= 40) return plain
     const allowOcr = opts?.ocr?.enabled ?? true
     if (!allowOcr) return plain
     opts?.onProgress?.({ stage: 'ocr:fallback' })
-    return (await ocrPdf(buf, opts)).trim()
+    return (await ocrPdf(bufForOcr, opts)).trim()
   }
   if (lower.endsWith('.docx')) {
     const buf = await file.arrayBuffer()

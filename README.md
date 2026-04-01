@@ -33,6 +33,15 @@ Pages 默认会按 SPA 方式处理路由刷新（项目不提供顶层 `404.htm
 - 路径：`/proxy?url=https://...`
 - 限制：只允许 http/https、阻止 localhost/内网 IP、最大 15MB
 
+### AI 字段抽取（可选，提升准确率）
+
+已新增 `functions/ai-extract.ts`：前端会在本地规则解析后，额外调用 `/ai-extract` 用大模型做字段抽取与纠错（姓名/地点/年限等）。
+
+在 Cloudflare Pages → Settings → Environment variables 配置（Production/Preview 都建议配）：
+- `LLM_BASE_URL`：你的 Poe/OpenAI 兼容网关 base url（需支持 `/v1/chat/completions`）
+- `LLM_API_KEY`：对应的 key（只配置在 Cloudflare，不会下发到浏览器）
+- `LLM_MODEL`：模型名（可选，默认 `gpt-4o-mini`）
+
 ### Supabase Storage（必须配置一次）
 
 前端会用 `anon key` 直传文件到 Storage。请在 Supabase 控制台里给 `resumes` bucket 开启上传权限（否则会报 RLS 错误）。

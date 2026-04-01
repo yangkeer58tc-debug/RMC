@@ -1,6 +1,7 @@
 import type { ResumeDetail, ResumeListItem } from '@/types/resume'
 import { supabase } from '@/lib/supabaseClient'
 import { extractTextFromFile, parseResumeText, type ExtractOptions } from '@/lib/resumeParserClient'
+import { aiExtract } from '@/lib/aiExtract'
 
 type ApiOk<T> = { success: true } & T
 
@@ -29,6 +30,28 @@ function guessFilenameFromUrl(url: string) {
   } catch {
     return 'resume'
   }
+}
+
+function inferNameFromFilename(filename: string) {
+  const base = filename.replace(/\.[^.]+$/, '')
+  const cleaned = base
+    .replace(/[_\-]+/g, ' ')
+    .replace(/\b(cv|resume|curriculo|currículo|curriculum|vitae)\b/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+  const ascii = cleaned.replace(/[^A-Za-zÀ-ÖØ-öø-ÿ\s'.-]/g, '').trim()
+  const words = ascii.split(/\s+/).filter(Boolean)
+  if (words.length >= 2 && ascii.length <= 80) return ascii
+  return null
+}
+
+function pickFirst<T>(...vals: Array<T | null | undefined>) {
+  for (const v of vals) {
+    if (v === null || v === undefined) continue
+    if (typeof v === 'string' && !v.trim()) continue
+    return v
+  }
+  return null
 }
 
 function normalizeExt(name: string) {
@@ -72,6 +95,24 @@ export async function importResumeUpload(file: File, opts?: ImportOpts) {
     }
     text_content = await extractTextFromFile(file, extractOpts)
     parsed = parseResumeText(text_content)
+
+    opts?.onProgress?.('AI 抽取中…')
+    const ai = await aiExtract(text_content, file.name)
+    if (ai) {
+      parsed = {
+        ...parsed,
+        name: pickFirst(ai.full_name, parsed.name) || undefined,
+        country: pickFirst(ai.country, parsed.country) || undefined,
+        city: pickFirst(ai.city, parsed.city) || undefined,
+        email: pickFirst(ai.email, parsed.email) || undefined,
+        whatsapp: pickFirst(ai.whatsapp, parsed.whatsapp) || undefined,
+        phone: pickFirst(ai.phone, parsed.phone) || undefined,
+        workYears: (ai.work_years ?? parsed.workYears) ?? undefined,
+        education: (ai.education as any) ?? parsed.education,
+        introSummaryOriginal: pickFirst(ai.intro_summary_original, parsed.introSummaryOriginal) || undefined,
+        introLanguage: pickFirst(ai.intro_language, parsed.introLanguage) || undefined,
+      }
+    }
   } catch (e) {
     parse_status = 'failed'
     parse_error = sbErrorMessage(e, '解析失败')
@@ -89,7 +130,7 @@ export async function importResumeUpload(file: File, opts?: ImportOpts) {
     storage_path,
     original_filename: file.name,
     text_content,
-    name: parsed.name || null,
+    name: (parsed.name || inferNameFromFilename(file.name)) || null,
     country: parsed.country || null,
     city: parsed.city || null,
     email: parsed.email || null,
@@ -170,6 +211,24 @@ export async function importResumeUrl(url: string, opts?: ImportOpts) {
     }
     text_content = await extractTextFromFile(file, extractOpts)
     parsed = parseResumeText(text_content)
+
+    opts?.onProgress?.('AI 抽取中…')
+    const ai = await aiExtract(text_content, filename)
+    if (ai) {
+      parsed = {
+        ...parsed,
+        name: pickFirst(ai.full_name, parsed.name) || undefined,
+        country: pickFirst(ai.country, parsed.country) || undefined,
+        city: pickFirst(ai.city, parsed.city) || undefined,
+        email: pickFirst(ai.email, parsed.email) || undefined,
+        whatsapp: pickFirst(ai.whatsapp, parsed.whatsapp) || undefined,
+        phone: pickFirst(ai.phone, parsed.phone) || undefined,
+        workYears: (ai.work_years ?? parsed.workYears) ?? undefined,
+        education: (ai.education as any) ?? parsed.education,
+        introSummaryOriginal: pickFirst(ai.intro_summary_original, parsed.introSummaryOriginal) || undefined,
+        introLanguage: pickFirst(ai.intro_language, parsed.introLanguage) || undefined,
+      }
+    }
   } catch (e) {
     parse_status = 'failed'
     parse_error = sbErrorMessage(e, '解析失败')
@@ -187,7 +246,7 @@ export async function importResumeUrl(url: string, opts?: ImportOpts) {
     storage_path,
     original_filename: filename,
     text_content,
-    name: parsed.name || null,
+    name: (parsed.name || inferNameFromFilename(filename)) || null,
     country: parsed.country || null,
     city: parsed.city || null,
     email: parsed.email || null,

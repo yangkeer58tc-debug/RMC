@@ -110,7 +110,8 @@ function extractLocation(text: string) {
     if (m?.[1]) {
       const v = m[1].trim()
       const parts = v.split(/[,，\-–—/|]+/).map((p) => p.trim()).filter(Boolean)
-      if (parts.length >= 2) return { city: parts[0], country: parts[parts.length - 1] }
+      if (parts.length >= 3) return { city: parts[parts.length - 2], country: parts[parts.length - 1] }
+      if (parts.length === 2) return { city: parts[0], country: parts[1] }
       return { city: v }
     }
   }
@@ -135,8 +136,29 @@ function extractWorkYears(text: string) {
   for (const m of text.matchAll(/(\d{1,2})\s*年(?:以上)?(?:工作)?经验/gi)) {
     candidates.push(Number(m[1]))
   }
-  if (!candidates.length) return undefined
-  return Math.max(...candidates)
+  if (candidates.length) return Math.max(...candidates)
+
+  const nowYear = new Date().getFullYear()
+  let minStart: number | null = null
+  let maxEnd: number | null = null
+
+  const rangeRe = /((?:19|20)\d{2})\s*(?:–|—|-|to)\s*(present|now|current|((?:19|20)\d{2}))/gi
+  for (const m of text.matchAll(rangeRe)) {
+    const start = Number(m[1])
+    const end = m[2] ? nowYear : Number(m[3])
+    if (Number.isNaN(start) || Number.isNaN(end)) continue
+    if (start < 1950 || start > nowYear) continue
+    if (end < 1950 || end > nowYear) continue
+    minStart = minStart === null ? start : Math.min(minStart, start)
+    maxEnd = maxEnd === null ? end : Math.max(maxEnd, end)
+  }
+
+  if (minStart !== null && maxEnd !== null && maxEnd >= minStart) {
+    const y = Math.min(60, Math.max(0, maxEnd - minStart))
+    if (y > 0) return y
+  }
+
+  return undefined
 }
 
 function findSection(text: string, headers: RegExp[]) {

@@ -13,6 +13,7 @@ export default function ImportPage() {
   const [url, setUrl] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [progress, setProgress] = useState<string | null>(null)
 
   const canSubmit = useMemo(() => {
     if (busy) return false
@@ -22,12 +23,13 @@ export default function ImportPage() {
 
   async function onSubmit() {
     setError(null)
+    setProgress(null)
     setBusy(true)
     try {
       const data =
         tab === 'upload'
-          ? await importResumeUpload(file as File)
-          : await importResumeUrl(url.trim())
+          ? await importResumeUpload(file as File, { onProgress: setProgress })
+          : await importResumeUrl(url.trim(), { onProgress: setProgress })
 
       nav(`/resumes/${data.resumeId}`)
     } catch (e) {
@@ -107,6 +109,11 @@ export default function ImportPage() {
           {error ? (
             <div className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
               {error}
+            </div>
+          ) : null}
+          {progress ? (
+            <div className="mt-4 rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2 text-xs text-zinc-700">
+              {progress}
             </div>
           ) : null}
 

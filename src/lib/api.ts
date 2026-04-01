@@ -1,8 +1,12 @@
 import type { ResumeDetail, ResumeListItem } from '@/types/resume'
 import { supabase } from '@/lib/supabaseClient'
-import { extractTextFromFile, parseResumeText } from '@/lib/resumeParserClient'
+import { extractTextFromFile, parseResumeText, type ExtractOptions } from '@/lib/resumeParserClient'
 
 type ApiOk<T> = { success: true } & T
+
+type ImportOpts = {
+  onProgress?: (msg: string) => void
+}
 
 function sbErrorMessage(e: unknown, fallback: string) {
   const msg = (e as { message?: string })?.message
@@ -32,10 +36,12 @@ function getPublicFileUrl(bucket: string, path: string) {
   return data.publicUrl
 }
 
-export async function importResumeUpload(file: File) {
+export async function importResumeUpload(file: File, opts?: ImportOpts) {
   const storage_bucket = 'resumes'
   const ext = normalizeExt(file.name)
   const storage_path = `${crypto.randomUUID()}.${ext}`
+
+  opts?.onProgress?.('上传中…')
 
   const { error: uploadErr } = await supabase.storage
     .from(storage_bucket)
@@ -48,11 +54,24 @@ export async function importResumeUpload(file: File) {
   let parsed: ReturnType<typeof parseResumeText> = {}
 
   try {
-    text_content = await extractTextFromFile(file)
+    opts?.onProgress?.('解析中…')
+    const extractOpts: ExtractOptions = {
+      ocr: { enabled: true, maxPages: 2 },
+      onProgress: (e) => {
+        const pct = typeof e.progress === 'number' ? ` ${Math.round(e.progress * 100)}%` : ''
+        opts?.onProgress?.(`${e.stage}${pct}`)
+      },
+    }
+    text_content = await extractTextFromFile(file, extractOpts)
     parsed = parseResumeText(text_content)
   } catch (e) {
     parse_status = 'failed'
     parse_error = sbErrorMessage(e, '解析失败')
+  }
+
+  if (parse_status === 'success' && (text_content || '').trim().length < 20) {
+    parse_status = 'failed'
+    parse_error = '未检测到可解析文本（可能是扫描版PDF，请稍后重试或使用OCR）'
   }
 
   const payload = {
@@ -76,6 +95,7 @@ export async function importResumeUpload(file: File) {
     parse_error,
   }
 
+  opts?.onProgress?.('入库中…')
   const { data, error } = await supabase.from('resumes').insert(payload).select('id, parse_status').single()
   if (error) throw new Error(sbErrorMessage(error, '入库失败'))
 
@@ -85,22 +105,25 @@ export async function importResumeUpload(file: File) {
   }>
 }
 
-export async function importResumeUrl(url: string) {
+export async function importResumeUrl(url: string, opts?: ImportOpts) {
   async function fetchRemote() {
     if (import.meta.env.PROD) {
       const proxied = `/proxy?url=${encodeURIComponent(url)}`
+      opts?.onProgress?.('下载中（通过代理）…')
       const r = await fetch(proxied)
       if (!r.ok) throw new Error(`代理下载失败：${r.status}`)
       return r
     }
 
     try {
+      opts?.onProgress?.('下载中…')
       const r = await fetch(url)
       if (r.type === 'opaque') throw new Error('CORS blocked')
       if (!r.ok) throw new Error(`下载链接失败：${r.status}`)
       return r
     } catch {
       const proxied = `/proxy?url=${encodeURIComponent(url)}`
+      opts?.onProgress?.('下载中（通过代理）…')
       const r = await fetch(proxied)
       if (!r.ok) throw new Error(`下载链接失败（可能被 CORS 拦截）：${r.status}`)
       return r
@@ -117,6 +140,7 @@ export async function importResumeUrl(url: string) {
   const ext = normalizeExt(filename)
   const storage_path = `${crypto.randomUUID()}.${ext}`
 
+  opts?.onProgress?.('上传中…')
   const { error: uploadErr } = await supabase.storage
     .from(storage_bucket)
     .upload(storage_path, file, { upsert: false, contentType: blob.type || undefined })
@@ -128,11 +152,24 @@ export async function importResumeUrl(url: string) {
   let parsed: ReturnType<typeof parseResumeText> = {}
 
   try {
-    text_content = await extractTextFromFile(file)
+    opts?.onProgress?.('解析中…')
+    const extractOpts: ExtractOptions = {
+      ocr: { enabled: true, maxPages: 2 },
+      onProgress: (e) => {
+        const pct = typeof e.progress === 'number' ? ` ${Math.round(e.progress * 100)}%` : ''
+        opts?.onProgress?.(`${e.stage}${pct}`)
+      },
+    }
+    text_content = await extractTextFromFile(file, extractOpts)
     parsed = parseResumeText(text_content)
   } catch (e) {
     parse_status = 'failed'
     parse_error = sbErrorMessage(e, '解析失败')
+  }
+
+  if (parse_status === 'success' && (text_content || '').trim().length < 20) {
+    parse_status = 'failed'
+    parse_error = '未检测到可解析文本（可能是扫描版PDF，请稍后重试或使用OCR）'
   }
 
   const payload = {
@@ -156,6 +193,7 @@ export async function importResumeUrl(url: string) {
     parse_error,
   }
 
+  opts?.onProgress?.('入库中…')
   const { data, error } = await supabase.from('resumes').insert(payload).select('id, parse_status').single()
   if (error) throw new Error(sbErrorMessage(error, '入库失败'))
 

@@ -29,6 +29,14 @@ export type ParsedResume = {
   introLanguage?: string
 }
 
+export type ExtractOptions = {
+  onProgress?: (e: { stage: string; progress?: number }) => void
+  ocr?: {
+    enabled?: boolean
+    maxPages?: number
+  }
+}
+
 function normalizeWhitespace(s: string) {
   return s.replace(/\r\n/g, '\n').replace(/[\t\f\v]+/g, ' ').replace(/\u00a0/g, ' ')
 }
@@ -218,11 +226,58 @@ async function extractTextFromPdf(arrayBuffer: ArrayBuffer) {
   return parts.join('\n')
 }
 
-export async function extractTextFromFile(file: File): Promise<string> {
+async function ocrPdf(arrayBuffer: ArrayBuffer, opts?: ExtractOptions) {
+  const maxPages = Math.max(1, opts?.ocr?.maxPages ?? 2)
+  opts?.onProgress?.({ stage: 'ocr:init' })
+
+  const { createWorker } = await import('tesseract.js')
+  const worker = await createWorker('eng', 1, {
+    logger: (m) => {
+      const stage = m?.status ? `ocr:${m.status}` : 'ocr:working'
+      opts?.onProgress?.({ stage, progress: m?.progress })
+    },
+  })
+
+  await worker.load()
+  await worker.reinitialize('eng')
+
+  const doc = await getDocument({ data: arrayBuffer }).promise
+  const pages = Math.min(doc.numPages, maxPages)
+  const chunks: string[] = []
+
+  for (let i = 1; i <= pages; i++) {
+    opts?.onProgress?.({ stage: `ocr:render:${i}/${pages}` })
+    const page = await doc.getPage(i)
+    const viewport = page.getViewport({ scale: 2 })
+    const canvas = document.createElement('canvas')
+    canvas.width = Math.ceil(viewport.width)
+    canvas.height = Math.ceil(viewport.height)
+    const ctx = canvas.getContext('2d')
+    if (!ctx) continue
+    await page.render({ canvasContext: ctx, viewport }).promise
+    const dataUrl = canvas.toDataURL('image/png')
+
+    opts?.onProgress?.({ stage: `ocr:recognize:${i}/${pages}` })
+    const result = await worker.recognize(dataUrl)
+    const text = result?.data?.text || ''
+    if (text.trim()) chunks.push(text)
+    if (chunks.join('\n').length > 1500) break
+  }
+
+  await worker.terminate()
+  return chunks.join('\n').trim()
+}
+
+export async function extractTextFromFile(file: File, opts?: ExtractOptions): Promise<string> {
   const lower = file.name.toLowerCase()
   if (lower.endsWith('.pdf')) {
     const buf = await file.arrayBuffer()
-    return extractTextFromPdf(buf)
+    const plain = (await extractTextFromPdf(buf)).trim()
+    if (plain.length >= 40) return plain
+    const allowOcr = opts?.ocr?.enabled ?? true
+    if (!allowOcr) return plain
+    opts?.onProgress?.({ stage: 'ocr:fallback' })
+    return (await ocrPdf(buf, opts)).trim()
   }
   if (lower.endsWith('.docx')) {
     const buf = await file.arrayBuffer()
@@ -258,4 +313,3 @@ export function parseResumeText(text: string): Omit<ParsedResume, 'textContent'>
     introLanguage: introLanguage && introLanguage !== 'und' ? introLanguage : undefined,
   }
 }
-

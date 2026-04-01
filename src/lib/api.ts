@@ -13,6 +13,14 @@ function sbErrorMessage(e: unknown, fallback: string) {
   return msg || fallback
 }
 
+function friendlyStorageUploadErrorMessage(raw: string) {
+  const lower = raw.toLowerCase()
+  if (lower.includes('row-level security') || lower.includes('rls') || lower.includes('unauthorized')) {
+    return '上传失败：Supabase Storage 未授权（RLS）。请在 Supabase SQL Editor 执行 README 里的 storage.objects policy，然后重试。'
+  }
+  return raw
+}
+
 function guessFilenameFromUrl(url: string) {
   try {
     const u = new URL(url)
@@ -46,7 +54,7 @@ export async function importResumeUpload(file: File, opts?: ImportOpts) {
   const { error: uploadErr } = await supabase.storage
     .from(storage_bucket)
     .upload(storage_path, file, { upsert: false, contentType: file.type || undefined })
-  if (uploadErr) throw new Error(sbErrorMessage(uploadErr, '上传失败'))
+  if (uploadErr) throw new Error(friendlyStorageUploadErrorMessage(sbErrorMessage(uploadErr, '上传失败')))
 
   let parse_status: ResumeDetail['parse_status'] = 'success'
   let parse_error: string | null = null
@@ -144,7 +152,7 @@ export async function importResumeUrl(url: string, opts?: ImportOpts) {
   const { error: uploadErr } = await supabase.storage
     .from(storage_bucket)
     .upload(storage_path, file, { upsert: false, contentType: blob.type || undefined })
-  if (uploadErr) throw new Error(sbErrorMessage(uploadErr, '上传失败'))
+  if (uploadErr) throw new Error(friendlyStorageUploadErrorMessage(sbErrorMessage(uploadErr, '上传失败')))
 
   let parse_status: ResumeDetail['parse_status'] = 'success'
   let parse_error: string | null = null

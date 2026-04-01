@@ -230,16 +230,22 @@ async function ocrPdf(arrayBuffer: ArrayBuffer, opts?: ExtractOptions) {
   const maxPages = Math.max(1, opts?.ocr?.maxPages ?? 2)
   opts?.onProgress?.({ stage: 'ocr:init' })
 
-  const { createWorker } = await import('tesseract.js')
-  const worker = await createWorker('eng', 1, {
-    logger: (m) => {
-      const stage = m?.status ? `ocr:${m.status}` : 'ocr:working'
-      opts?.onProgress?.({ stage, progress: m?.progress })
-    },
-  })
+  let worker: Awaited<ReturnType<(typeof import('tesseract.js'))['createWorker']>> | null = null
+  try {
+    const { createWorker } = await import('tesseract.js')
+    worker = await createWorker('eng', 1, {
+      logger: (m) => {
+        const stage = m?.status ? `ocr:${m.status}` : 'ocr:working'
+        opts?.onProgress?.({ stage, progress: m?.progress })
+      },
+    })
 
-  await worker.load()
-  await worker.reinitialize('eng')
+    await worker.load()
+    await worker.reinitialize('eng')
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : 'OCR 初始化失败'
+    throw new Error(`OCR 初始化失败：${msg}`)
+  }
 
   const doc = await getDocument({ data: arrayBuffer }).promise
   const pages = Math.min(doc.numPages, maxPages)
@@ -248,19 +254,51 @@ async function ocrPdf(arrayBuffer: ArrayBuffer, opts?: ExtractOptions) {
   for (let i = 1; i <= pages; i++) {
     opts?.onProgress?.({ stage: `ocr:render:${i}/${pages}` })
     const page = await doc.getPage(i)
-    const viewport = page.getViewport({ scale: 2 })
+    const viewport = page.getViewport({ scale: 3 })
     const canvas = document.createElement('canvas')
     canvas.width = Math.ceil(viewport.width)
     canvas.height = Math.ceil(viewport.height)
     const ctx = canvas.getContext('2d')
     if (!ctx) continue
     await page.render({ canvasContext: ctx, viewport }).promise
-    const dataUrl = canvas.toDataURL('image/png')
+    const img = ctx.getImageData(0, 0, canvas.width, canvas.height)
+    const d = img.data
+    for (let p = 0; p < d.length; p += 4) {
+      const r = d[p] ?? 0
+      const g = d[p + 1] ?? 0
+      const b = d[p + 2] ?? 0
+      const y = Math.round(0.299 * r + 0.587 * g + 0.114 * b)
+      const v = y > 170 ? 255 : 0
+      d[p] = v
+      d[p + 1] = v
+      d[p + 2] = v
+    }
+    ctx.putImageData(img, 0, 0)
 
-    opts?.onProgress?.({ stage: `ocr:recognize:${i}/${pages}` })
-    const result = await worker.recognize(dataUrl)
-    const text = result?.data?.text || ''
-    if (text.trim()) chunks.push(text)
+    const half = Math.floor(canvas.width / 2)
+    const crops: Array<{ label: string; x: number; w: number }> = [
+      { label: 'left', x: 0, w: half },
+      { label: 'right', x: half, w: canvas.width - half },
+    ]
+
+    for (const c of crops) {
+      const crop = document.createElement('canvas')
+      crop.width = c.w
+      crop.height = canvas.height
+      const cctx = crop.getContext('2d')
+      if (!cctx) continue
+      cctx.drawImage(canvas, c.x, 0, c.w, canvas.height, 0, 0, c.w, canvas.height)
+      const dataUrl = crop.toDataURL('image/png')
+      opts?.onProgress?.({ stage: `ocr:recognize:${i}/${pages}:${c.label}` })
+      try {
+        const result = await worker.recognize(dataUrl)
+        const text = result?.data?.text || ''
+        if (text.trim()) chunks.push(text)
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : 'OCR 识别失败'
+        throw new Error(`OCR 识别失败：${msg}`)
+      }
+    }
     if (chunks.join('\n').length > 1500) break
   }
 

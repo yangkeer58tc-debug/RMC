@@ -75,6 +75,7 @@ export async function onRequestPost(context: { request: Request; env: Record<str
       {
         success: false,
         error: 'Missing LLM_API_KEY or LLM_BASE_URL',
+        meta: { model, base_url: baseUrl || null },
       },
       { status: 501 },
     )
@@ -95,7 +96,7 @@ export async function onRequestPost(context: { request: Request; env: Record<str
   const { text, filename } = parsed.data
 
   const system =
-    'You extract structured fields from resume text. Output ONLY valid JSON, no markdown.'
+    'You are a resume parsing engine. Extract only information explicitly supported by the resume text. Do not guess. Output ONLY valid JSON, no markdown.'
   const user =
     `Resume filename: ${filename || ''}\n` +
     `Resume text:\n${text}\n\n` +
@@ -103,7 +104,9 @@ export async function onRequestPost(context: { request: Request; env: Record<str
     '- full_name should be the display name.\n' +
     '- first_name/last_name should be split if possible.\n' +
     '- country should be a country name (e.g., United Arab Emirates) or ISO-2 if clearly present; do not guess.\n' +
-    '- work_years should be computed from date ranges if possible (use current year for Present).\n' +
+    '- city should be the city part of location if present; do not guess.\n' +
+    '- work_years MUST be derived from explicit date ranges in the text; use current year for Present; if ranges are missing, return null.\n' +
+    '- For OCR text, prioritize lines near headings like NAME/CONTACT/LOCATION/ABOUT/EXPERIENCE.\n' +
     '- intro_summary_original must keep the resume original language.'
 
   const url = baseUrl.replace(/\/$/, '') + '/v1/chat/completions'
@@ -117,6 +120,7 @@ export async function onRequestPost(context: { request: Request; env: Record<str
     body: JSON.stringify({
       model,
       temperature: 0,
+      response_format: { type: 'json_object' },
       messages: [
         { role: 'system', content: system },
         { role: 'user', content: user },
@@ -152,5 +156,13 @@ export async function onRequestPost(context: { request: Request; env: Record<str
     return json({ success: false, error: 'LLM JSON does not match schema' }, { status: 502 })
   }
 
-  return json({ success: true, data: validated.data })
+  return json({
+    success: true,
+    data: validated.data,
+    meta: {
+      model,
+      base_url: baseUrl,
+      input_chars: text.length,
+    },
+  })
 }

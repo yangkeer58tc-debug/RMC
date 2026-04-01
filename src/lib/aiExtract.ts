@@ -13,19 +13,30 @@ export type AiExtractResult = {
   intro_language?: string | null
 }
 
-export async function aiExtract(text: string, filename?: string) {
+export type AiExtractMeta = {
+  model?: string
+  base_url?: string
+  input_chars?: number
+}
+
+export type AiExtractResponse =
+  | { ok: true; data: AiExtractResult; meta?: AiExtractMeta }
+  | { ok: false; error: string; meta?: AiExtractMeta }
+
+export async function aiExtract(text: string, filename?: string): Promise<AiExtractResponse> {
   try {
     const res = await fetch('/ai-extract', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ text, filename }),
     })
-    if (!res.ok) return null
-    const data = (await res.json()) as unknown
-    const payload = data as { success?: boolean; data?: AiExtractResult }
-    if (!payload?.success) return null
-    return payload.data || null
+    const data = (await res.json().catch(() => null)) as unknown
+    const payload = data as { success?: boolean; data?: AiExtractResult; error?: string; meta?: AiExtractMeta }
+    if (!res.ok || !payload?.success) {
+      return { ok: false, error: payload?.error || `AI request failed: ${res.status}`, meta: payload?.meta }
+    }
+    return { ok: true, data: payload.data || {}, meta: payload.meta }
   } catch {
-    return null
+    return { ok: false, error: 'AI request failed', meta: undefined }
   }
 }

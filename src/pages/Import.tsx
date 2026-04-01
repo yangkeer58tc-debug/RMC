@@ -139,6 +139,7 @@ export default function ImportPage() {
             <li>字段抽取基于本地解析与规则匹配，不使用任何付费 API。</li>
             <li>自我介绍摘要为抽取式摘要，保持原语言，不做翻译。</li>
             <li>解析不准的字段可在详情页手动修改并保存。</li>
+            <li>如果你配置了 Poe/OpenAI 兼容网关，系统会额外用 AI 做字段纠错与补全（详情页会显示 AI 是否生效）。</li>
           </ul>
         </div>
       </main>

@@ -108,7 +108,18 @@ export async function importResumeUpload(file: File, opts?: ImportOpts) {
     parsed = parseResumeText(text_content)
 
     opts?.onProgress?.('AI 抽取中…')
-    const ai = await aiExtract(text_content, file.name)
+    const aiRes = await aiExtract(text_content, file.name)
+    const aiUsed = aiRes.ok
+    const aiModel = aiRes.meta?.model || null
+    let aiError: string | null = null
+    let ai: any = null
+    if (aiRes.ok) ai = aiRes.data
+    if ('error' in aiRes) aiError = aiRes.error
+    ;(parsed as any).aiUsed = aiUsed
+    ;(parsed as any).aiModel = aiModel
+    ;(parsed as any).aiError = aiError
+    ;(parsed as any).aiExtractedAt = aiUsed ? new Date().toISOString() : null
+
     if (ai) {
       parsed = {
         ...parsed,
@@ -161,6 +172,10 @@ export async function importResumeUpload(file: File, opts?: ImportOpts) {
     education: parsed.education ?? null,
     intro_summary_original: parsed.introSummaryOriginal || null,
     intro_language: parsed.introLanguage || null,
+    ai_used: ((parsed as any).aiUsed as boolean | undefined) || false,
+    ai_model: ((parsed as any).aiModel as string | null | undefined) || null,
+    ai_error: ((parsed as any).aiError as string | null | undefined) || null,
+    ai_extracted_at: ((parsed as any).aiExtractedAt as string | null | undefined) || null,
     parse_status,
     parse_error,
   }
@@ -234,7 +249,18 @@ export async function importResumeUrl(url: string, opts?: ImportOpts) {
     parsed = parseResumeText(text_content)
 
     opts?.onProgress?.('AI 抽取中…')
-    const ai = await aiExtract(text_content, filename)
+    const aiRes = await aiExtract(text_content, filename)
+    const aiUsed = aiRes.ok
+    const aiModel = aiRes.meta?.model || null
+    let aiError: string | null = null
+    let ai: any = null
+    if (aiRes.ok) ai = aiRes.data
+    if ('error' in aiRes) aiError = aiRes.error
+    ;(parsed as any).aiUsed = aiUsed
+    ;(parsed as any).aiModel = aiModel
+    ;(parsed as any).aiError = aiError
+    ;(parsed as any).aiExtractedAt = aiUsed ? new Date().toISOString() : null
+
     if (ai) {
       parsed = {
         ...parsed,
@@ -287,6 +313,10 @@ export async function importResumeUrl(url: string, opts?: ImportOpts) {
     education: parsed.education ?? null,
     intro_summary_original: parsed.introSummaryOriginal || null,
     intro_language: parsed.introLanguage || null,
+    ai_used: ((parsed as any).aiUsed as boolean | undefined) || false,
+    ai_model: ((parsed as any).aiModel as string | null | undefined) || null,
+    ai_error: ((parsed as any).aiError as string | null | undefined) || null,
+    ai_extracted_at: ((parsed as any).aiExtractedAt as string | null | undefined) || null,
     parse_status,
     parse_error,
   }
@@ -388,7 +418,18 @@ export async function reparseResume(id: string) {
     text_content = await extractTextFromFile(file, extractOpts)
     parsed = parseResumeText(text_content)
 
-    const ai = await aiExtract(text_content, filename)
+    const aiRes = await aiExtract(text_content, filename)
+    const aiUsed = aiRes.ok
+    const aiModel = aiRes.meta?.model || null
+    let aiError: string | null = null
+    let ai: any = null
+    if (aiRes.ok) ai = aiRes.data
+    if ('error' in aiRes) aiError = aiRes.error
+    ;(parsed as any).aiUsed = aiUsed
+    ;(parsed as any).aiModel = aiModel
+    ;(parsed as any).aiError = aiError
+    ;(parsed as any).aiExtractedAt = aiUsed ? new Date().toISOString() : null
+
     if (ai) {
       parsed = {
         ...parsed,
@@ -431,6 +472,10 @@ export async function reparseResume(id: string) {
     education: parsed.education ?? null,
     intro_summary_original: parsed.introSummaryOriginal || null,
     intro_language: parsed.introLanguage || null,
+    ai_used: ((parsed as any).aiUsed as boolean | undefined) || false,
+    ai_model: ((parsed as any).aiModel as string | null | undefined) || null,
+    ai_error: ((parsed as any).aiError as string | null | undefined) || null,
+    ai_extracted_at: ((parsed as any).aiExtractedAt as string | null | undefined) || null,
     parse_status,
     parse_error,
     updated_at: new Date().toISOString(),

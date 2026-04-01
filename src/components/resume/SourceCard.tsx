@@ -8,6 +8,17 @@ export default function SourceCard({ item }: { item: ResumeDetail }) {
       <h2 className="text-sm font-semibold text-zinc-900">来源与状态</h2>
       <div className="mt-3 space-y-2 text-sm text-zinc-700">
         <div className="flex items-center justify-between">
+          <span className="text-zinc-500">AI</span>
+          <span className={item.ai_used ? 'text-emerald-700' : 'text-zinc-700'}>
+            {item.ai_used ? `已启用${item.ai_model ? `（${item.ai_model}）` : ''}` : '未启用'}
+          </span>
+        </div>
+        {!item.ai_used && item.ai_error ? (
+          <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+            {item.ai_error}
+          </div>
+        ) : null}
+        <div className="flex items-center justify-between">
           <span className="text-zinc-500">状态</span>
           <StatusBadge status={item.parse_status} />
         </div>

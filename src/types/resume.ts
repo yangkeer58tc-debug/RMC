@@ -21,6 +21,10 @@ export type ResumeListItem = {
   whatsapp: string | null
   phone: string | null
   work_years: number | null
+  ai_used: boolean
+  ai_model: string | null
+  ai_error: string | null
+  ai_extracted_at: string | null
   parse_status: ParseStatus
   parse_error: string | null
   created_at: string

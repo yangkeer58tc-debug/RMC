@@ -65,6 +65,46 @@ function pickFirst<T>(...vals: Array<T | null | undefined>) {
   return null
 }
 
+function asYearString(v: unknown) {
+  if (typeof v !== 'string') return null
+  const t = v.trim()
+  const m = t.match(/(19|20)\d{2}/)
+  return m?.[0] || null
+}
+
+function normalizeEducationAny(input: unknown) {
+  if (!Array.isArray(input)) return null
+  const items = input
+    .map((it) => {
+      const obj = it as any
+      const degree = typeof obj?.degree === 'string' ? obj.degree.trim() : typeof obj?.raw === 'string' ? obj.raw.trim() : null
+      const startDate = asYearString(obj?.startDate ?? obj?.start_date ?? obj?.startYear ?? obj?.start_year)
+      const endDate = asYearString(obj?.endDate ?? obj?.end_date ?? obj?.endYear ?? obj?.end_year)
+      const raw = typeof obj?.raw === 'string' ? obj.raw.trim() : degree
+      if (!degree && !raw) return null
+      return { degree: degree || raw || undefined, startDate: startDate || undefined, endDate: endDate || undefined, raw: raw || undefined }
+    })
+    .filter(Boolean)
+  return items.length ? items : null
+}
+
+function mergeEducation(aiEdu: unknown, parsedEdu: unknown) {
+  const ai = normalizeEducationAny(aiEdu)
+  const parsed = normalizeEducationAny(parsedEdu)
+  if (!ai) return parsed
+  if (!parsed) return ai
+  return ai.map((a) => {
+    const key = (a.degree || a.raw || '').toLowerCase()
+    const p = parsed.find((x) => ((x.degree || x.raw || '').toLowerCase() === key))
+    return {
+      degree: a.degree || p?.degree,
+      startDate: a.startDate || p?.startDate,
+      endDate: a.endDate || p?.endDate,
+      raw: a.raw || p?.raw,
+    }
+  })
+}
+
 function normalizeExt(name: string) {
   const lower = name.toLowerCase()
   if (lower.endsWith('.pdf')) return 'pdf'
@@ -130,7 +170,7 @@ export async function importResumeUpload(file: File, opts?: ImportOpts) {
         whatsapp: pickFirst(ai.whatsapp, parsed.whatsapp) || undefined,
         phone: pickFirst(ai.phone, parsed.phone) || undefined,
         workYears: (ai.work_years ?? parsed.workYears) ?? undefined,
-        education: (ai.education as any) ?? parsed.education,
+        education: mergeEducation(ai.education, parsed.education) ?? undefined,
         introSummaryOriginal: pickFirst(ai.intro_summary_original, parsed.introSummaryOriginal) || undefined,
         introLanguage: pickFirst(ai.intro_language, parsed.introLanguage) || undefined,
       }
@@ -276,7 +316,7 @@ export async function importResumeUrl(url: string, opts?: ImportOpts) {
         whatsapp: pickFirst(ai.whatsapp, parsed.whatsapp) || undefined,
         phone: pickFirst(ai.phone, parsed.phone) || undefined,
         workYears: (ai.work_years ?? parsed.workYears) ?? undefined,
-        education: (ai.education as any) ?? parsed.education,
+        education: mergeEducation(ai.education, parsed.education) ?? undefined,
         introSummaryOriginal: pickFirst(ai.intro_summary_original, parsed.introSummaryOriginal) || undefined,
         introLanguage: pickFirst(ai.intro_language, parsed.introLanguage) || undefined,
       }
@@ -452,7 +492,7 @@ export async function reparseResume(id: string) {
         whatsapp: pickFirst(ai.whatsapp, parsed.whatsapp) || undefined,
         phone: pickFirst(ai.phone, parsed.phone) || undefined,
         workYears: (ai.work_years ?? parsed.workYears) ?? undefined,
-        education: (ai.education as any) ?? parsed.education,
+        education: mergeEducation(ai.education, parsed.education) ?? undefined,
         introSummaryOriginal: pickFirst(ai.intro_summary_original, parsed.introSummaryOriginal) || undefined,
         introLanguage: pickFirst(ai.intro_language, parsed.introLanguage) || undefined,
       }

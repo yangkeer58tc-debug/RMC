@@ -141,9 +141,20 @@ function extractWorkYears(text: string) {
   let maxEnd: number | null = null
 
   const rangeRe = /((?:19|20)\d{2})\s*(?:–|—|-|to)\s*(present|now|current|((?:19|20)\d{2}))/gi
+  const rangeRePt = /(de\s*)?((?:19|20)\d{2})\s*(?:a|até|–|—|-|to)\s*(present|atual|hoje|now|current|((?:19|20)\d{2}))/gi
   for (const m of text.matchAll(rangeRe)) {
     const start = Number(m[1])
     const end = m[2] ? nowYear : Number(m[3])
+    if (Number.isNaN(start) || Number.isNaN(end)) continue
+    if (start < 1950 || start > nowYear) continue
+    if (end < 1950 || end > nowYear) continue
+    minStart = minStart === null ? start : Math.min(minStart, start)
+    maxEnd = maxEnd === null ? end : Math.max(maxEnd, end)
+  }
+
+  for (const m of text.matchAll(rangeRePt)) {
+    const start = Number(m[2])
+    const end = m[3] && /present|atual|hoje|now|current/i.test(m[3]) ? nowYear : Number(m[4])
     if (Number.isNaN(start) || Number.isNaN(end)) continue
     if (start < 1950 || start > nowYear) continue
     if (end < 1950 || end > nowYear) continue

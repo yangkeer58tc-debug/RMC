@@ -18,6 +18,20 @@ export default function BasicInfoCard({
         <StatusBadge status={item.parse_status} />
       </div>
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+        <Field label="名字">
+          <input
+            value={effective.first_name || ''}
+            onChange={(e) => setField('first_name', e.target.value || null)}
+            className="w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm"
+          />
+        </Field>
+        <Field label="姓氏">
+          <input
+            value={effective.last_name || ''}
+            onChange={(e) => setField('last_name', e.target.value || null)}
+            className="w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm"
+          />
+        </Field>
         <Field label="姓名">
           <input
             value={effective.name || ''}
@@ -55,4 +69,3 @@ export default function BasicInfoCard({
     </div>
   )
 }
-

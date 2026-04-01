@@ -99,7 +99,7 @@ export default function ResumeDetailPage() {
               / 简历详情
             </div>
             <h1 className="mt-1 text-lg font-semibold text-zinc-900">
-              {item?.name || '简历详情'}
+              {item?.name || [item?.first_name, item?.last_name].filter(Boolean).join(' ') || '简历详情'}
             </h1>
           </div>
           <div className="flex items-center gap-2">

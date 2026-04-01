@@ -12,6 +12,8 @@ export type EducationItem = {
 
 export type ResumeListItem = {
   id: string
+  first_name: string | null
+  last_name: string | null
   name: string | null
   country: string | null
   city: string | null

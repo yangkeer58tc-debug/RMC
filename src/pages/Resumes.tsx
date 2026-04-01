@@ -156,7 +156,7 @@ export default function ResumesPage() {
                 className="grid grid-cols-12 gap-0 border-b border-zinc-100 px-4 py-3 text-sm text-zinc-800 last:border-b-0"
               >
                 <div className="col-span-3 truncate font-medium text-zinc-900">
-                  {it.name || '未命名'}
+                  {it.name || [it.first_name, it.last_name].filter(Boolean).join(' ') || '未命名'}
                 </div>
                 <div className="col-span-2 truncate text-zinc-700">
                   {[it.country, it.city].filter(Boolean).join(' / ') || '-'}

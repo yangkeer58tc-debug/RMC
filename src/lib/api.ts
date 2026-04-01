@@ -45,6 +45,17 @@ function inferNameFromFilename(filename: string) {
   return null
 }
 
+function inferNameParts(fullName: string | null | undefined): { first_name: string | null; last_name: string | null } {
+  const name = (fullName || '').trim()
+  if (!name) return { first_name: null, last_name: null }
+
+  const parts = name.split(/\s+/).filter(Boolean)
+  if (parts.length < 2) return { first_name: null, last_name: null }
+  const last = parts[parts.length - 1] || null
+  const first = parts.slice(0, -1).join(' ') || null
+  return { first_name: first, last_name: last }
+}
+
 function pickFirst<T>(...vals: Array<T | null | undefined>) {
   for (const v of vals) {
     if (v === null || v === undefined) continue
@@ -112,6 +123,14 @@ export async function importResumeUpload(file: File, opts?: ImportOpts) {
         introSummaryOriginal: pickFirst(ai.intro_summary_original, parsed.introSummaryOriginal) || undefined,
         introLanguage: pickFirst(ai.intro_language, parsed.introLanguage) || undefined,
       }
+
+      const inferred = inferNameParts(parsed.name)
+      ;(parsed as any).firstName = pickFirst(ai.first_name, inferred.first_name) || undefined
+      ;(parsed as any).lastName = pickFirst(ai.last_name, inferred.last_name) || undefined
+    } else {
+      const inferred = inferNameParts(parsed.name)
+      ;(parsed as any).firstName = inferred.first_name || undefined
+      ;(parsed as any).lastName = inferred.last_name || undefined
     }
   } catch (e) {
     parse_status = 'failed'
@@ -130,6 +149,8 @@ export async function importResumeUpload(file: File, opts?: ImportOpts) {
     storage_path,
     original_filename: file.name,
     text_content,
+    first_name: ((parsed as any).firstName as string | undefined) || null,
+    last_name: ((parsed as any).lastName as string | undefined) || null,
     name: (parsed.name || inferNameFromFilename(file.name)) || null,
     country: parsed.country || null,
     city: parsed.city || null,
@@ -228,6 +249,14 @@ export async function importResumeUrl(url: string, opts?: ImportOpts) {
         introSummaryOriginal: pickFirst(ai.intro_summary_original, parsed.introSummaryOriginal) || undefined,
         introLanguage: pickFirst(ai.intro_language, parsed.introLanguage) || undefined,
       }
+
+      const inferred = inferNameParts(parsed.name)
+      ;(parsed as any).firstName = pickFirst(ai.first_name, inferred.first_name) || undefined
+      ;(parsed as any).lastName = pickFirst(ai.last_name, inferred.last_name) || undefined
+    } else {
+      const inferred = inferNameParts(parsed.name)
+      ;(parsed as any).firstName = inferred.first_name || undefined
+      ;(parsed as any).lastName = inferred.last_name || undefined
     }
   } catch (e) {
     parse_status = 'failed'
@@ -246,6 +275,8 @@ export async function importResumeUrl(url: string, opts?: ImportOpts) {
     storage_path,
     original_filename: filename,
     text_content,
+    first_name: ((parsed as any).firstName as string | undefined) || null,
+    last_name: ((parsed as any).lastName as string | undefined) || null,
     name: (parsed.name || inferNameFromFilename(filename)) || null,
     country: parsed.country || null,
     city: parsed.city || null,
@@ -305,7 +336,19 @@ export async function getResume(id: string) {
 
 export async function updateResume(id: string, patch: Partial<ResumeDetail>) {
   const body: Record<string, unknown> = {}
-  const allowed = ['name', 'country', 'city', 'email', 'whatsapp', 'phone', 'work_years', 'education', 'intro_summary_original']
+  const allowed = [
+    'first_name',
+    'last_name',
+    'name',
+    'country',
+    'city',
+    'email',
+    'whatsapp',
+    'phone',
+    'work_years',
+    'education',
+    'intro_summary_original',
+  ]
   for (const k of allowed) {
     if (k in patch) body[k] = (patch as Record<string, unknown>)[k]
   }

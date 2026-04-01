@@ -99,7 +99,12 @@ export async function onRequestPost(context: { request: Request; env: Record<str
   const user =
     `Resume filename: ${filename || ''}\n` +
     `Resume text:\n${text}\n\n` +
-    'Return JSON with keys: full_name, first_name, last_name, country, city, email, whatsapp, phone, work_years, education, intro_summary_original, intro_language. Use null when unknown. intro_summary_original must keep the resume original language.'
+    'Return JSON with keys: full_name, first_name, last_name, country, city, email, whatsapp, phone, work_years, education, intro_summary_original, intro_language. Use null when unknown.\n' +
+    '- full_name should be the display name.\n' +
+    '- first_name/last_name should be split if possible.\n' +
+    '- country should be a country name (e.g., United Arab Emirates) or ISO-2 if clearly present; do not guess.\n' +
+    '- work_years should be computed from date ranges if possible (use current year for Present).\n' +
+    '- intro_summary_original must keep the resume original language.'
 
   const url = baseUrl.replace(/\/$/, '') + '/v1/chat/completions'
 
@@ -149,4 +154,3 @@ export async function onRequestPost(context: { request: Request; env: Record<str
 
   return json({ success: true, data: validated.data })
 }
-

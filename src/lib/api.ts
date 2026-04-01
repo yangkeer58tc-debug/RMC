@@ -382,8 +382,36 @@ export async function reparseResume(id: string) {
   let parsed: ReturnType<typeof parseResumeText> = {}
 
   try {
-    text_content = await extractTextFromFile(file)
+    const extractOpts: ExtractOptions = {
+      ocr: { enabled: true, maxPages: 2 },
+    }
+    text_content = await extractTextFromFile(file, extractOpts)
     parsed = parseResumeText(text_content)
+
+    const ai = await aiExtract(text_content, filename)
+    if (ai) {
+      parsed = {
+        ...parsed,
+        name: pickFirst(ai.full_name, parsed.name) || undefined,
+        country: pickFirst(ai.country, parsed.country) || undefined,
+        city: pickFirst(ai.city, parsed.city) || undefined,
+        email: pickFirst(ai.email, parsed.email) || undefined,
+        whatsapp: pickFirst(ai.whatsapp, parsed.whatsapp) || undefined,
+        phone: pickFirst(ai.phone, parsed.phone) || undefined,
+        workYears: (ai.work_years ?? parsed.workYears) ?? undefined,
+        education: (ai.education as any) ?? parsed.education,
+        introSummaryOriginal: pickFirst(ai.intro_summary_original, parsed.introSummaryOriginal) || undefined,
+        introLanguage: pickFirst(ai.intro_language, parsed.introLanguage) || undefined,
+      }
+
+      const inferred = inferNameParts(parsed.name)
+      ;(parsed as any).firstName = pickFirst(ai.first_name, inferred.first_name) || undefined
+      ;(parsed as any).lastName = pickFirst(ai.last_name, inferred.last_name) || undefined
+    } else {
+      const inferred = inferNameParts(parsed.name)
+      ;(parsed as any).firstName = inferred.first_name || undefined
+      ;(parsed as any).lastName = inferred.last_name || undefined
+    }
   } catch (e) {
     parse_status = 'failed'
     parse_error = sbErrorMessage(e, '解析失败')
@@ -391,7 +419,9 @@ export async function reparseResume(id: string) {
 
   const patch = {
     text_content,
-    name: parsed.name || null,
+    first_name: ((parsed as any).firstName as string | undefined) || null,
+    last_name: ((parsed as any).lastName as string | undefined) || null,
+    name: (parsed.name || inferNameFromFilename(filename)) || null,
     country: parsed.country || null,
     city: parsed.city || null,
     email: parsed.email || null,

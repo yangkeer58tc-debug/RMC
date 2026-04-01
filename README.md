@@ -38,7 +38,8 @@ Pages 默认会按 SPA 方式处理路由刷新（项目不提供顶层 `404.htm
 已新增 `functions/ai-extract.ts`：前端会在本地规则解析后，额外调用 `/ai-extract` 用大模型做字段抽取与纠错（姓名/地点/年限等）。
 
 在 Cloudflare Pages → Settings → Environment variables 配置（Production/Preview 都建议配）：
-- `LLM_BASE_URL`：你的 Poe/OpenAI 兼容网关 base url（需支持 `/v1/chat/completions`）
+- `LLM_BASE_URL`：你的 Poe/OpenAI 兼容网关 base url（需支持 OpenAI Chat Completions）。
+  - 可填 `https://api.poe.com` 或 `https://api.poe.com/v1`（两种都支持）
 - `LLM_API_KEY`：对应的 key（只配置在 Cloudflare，不会下发到浏览器）
 - `LLM_MODEL`：模型名（可选，默认 `gpt-4o-mini`）
 

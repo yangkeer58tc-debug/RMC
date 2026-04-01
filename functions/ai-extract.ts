@@ -126,7 +126,8 @@ export async function onRequestPost(context: { request: Request; env: Record<str
     '- For OCR text, prioritize lines near headings like NAME/CONTACT/LOCATION/ABOUT/EXPERIENCE.\n' +
     '- intro_summary_original must keep the resume original language.'
 
-  const url = baseUrl.replace(/\/$/, '') + '/v1/chat/completions'
+  const base = baseUrl.replace(/\/$/, '')
+  const url = base.endsWith('/v1') ? base + '/chat/completions' : base + '/v1/chat/completions'
 
   const upstream = await fetch(url, {
     method: 'POST',

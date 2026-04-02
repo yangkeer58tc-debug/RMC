@@ -89,11 +89,11 @@ function extractName(text: string) {
     if (m?.[1]) return m[1].trim().slice(0, 80)
   }
 
-  const ignored = /(email|e-mail|phone|tel|mobile|whats?app|linkedin|github|www\.|http)/i
+  const ignored = /(email|e-mail|phone|tel|mobile|whats?app|linkedin|github|www\.|http|curr[ií]culo|curriculum|vitae|resume|cv\b)/i
   const candidates = lines.slice(0, 12).filter((l) => !ignored.test(l))
   for (const l of candidates) {
-    const ascii = l.replace(/[^A-Za-z\s'.-]/g, '').trim()
-    if (ascii.split(/\s+/).filter(Boolean).length >= 2 && ascii.length <= 40) return ascii
+    const latin = l.replace(/[^\p{L}\s'.-]/gu, '').trim()
+    if (latin.split(/\s+/).filter(Boolean).length >= 2 && latin.length <= 60) return latin
     const cjk = l.replace(/[^\u4e00-\u9fff·\s]/g, '').replace(/\s+/g, '').trim()
     if (cjk.length >= 2 && cjk.length <= 6) return cjk
   }

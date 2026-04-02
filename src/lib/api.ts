@@ -435,6 +435,38 @@ export async function listResumes(params: {
   return { success: true, items: (data || []) as ResumeListItem[] } satisfies ApiOk<{ items: ResumeListItem[] }>
 }
 
+export async function deleteResumes(ids: string[]) {
+  const uniq = Array.from(new Set(ids.map(String))).filter(Boolean)
+  if (!uniq.length) return { success: true, deleted: 0 } satisfies ApiOk<{ deleted: number }>
+
+  const { data: rows, error: fetchErr } = await supabase
+    .from('resumes')
+    .select('id, storage_bucket, storage_path')
+    .in('id', uniq)
+
+  if (fetchErr) throw new Error(sbErrorMessage(fetchErr, '获取简历失败'))
+
+  const { error: delErr } = await supabase.from('resumes').delete().in('id', uniq)
+  if (delErr) throw new Error(sbErrorMessage(delErr, '删除失败'))
+
+  const byBucket = new Map<string, string[]>()
+  for (const r of rows || []) {
+    const b = String((r as any).storage_bucket || '')
+    const p = String((r as any).storage_path || '')
+    if (!b || !p) continue
+    const list = byBucket.get(b) || []
+    list.push(p)
+    byBucket.set(b, list)
+  }
+
+  for (const [bucket, paths] of byBucket) {
+    if (!paths.length) continue
+    await supabase.storage.from(bucket).remove(paths)
+  }
+
+  return { success: true, deleted: uniq.length } satisfies ApiOk<{ deleted: number }>
+}
+
 export async function getResume(id: string) {
   const { data, error } = await supabase.from('resumes').select('*').eq('id', id).single()
   if (error) throw new Error(sbErrorMessage(error, '加载失败'))

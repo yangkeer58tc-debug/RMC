@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import TopBar from '@/components/TopBar'
 import StatusBadge from '@/components/StatusBadge'
-import { listResumes, updateResume } from '@/lib/api'
+import { deleteResumes, listResumes, updateResume } from '@/lib/api'
 import { cn } from '@/lib/utils'
 import type { ResumeListItem } from '@/types/resume'
 
@@ -17,6 +17,8 @@ export default function ResumesPage() {
   const [draftNote, setDraftNote] = useState<Record<string, string>>({})
   const [draftDirection, setDraftDirection] = useState<Record<string, string>>({})
   const [saving, setSaving] = useState<Record<string, boolean>>({})
+  const [selected, setSelected] = useState<Record<string, boolean>>({})
+  const selectedCount = useMemo(() => Object.values(selected).filter(Boolean).length, [selected])
 
   const params = useMemo(
     () => ({ q, country, status }),
@@ -29,6 +31,7 @@ export default function ResumesPage() {
     try {
       const data = await listResumes(params)
       setItems(data.items)
+      setSelected({})
       setDraftNote((prev) => {
         const next = { ...prev }
         for (const it of data.items) {
@@ -64,6 +67,38 @@ export default function ResumesPage() {
     },
     [setItems],
   )
+
+  const toggleAll = useCallback(
+    (checked: boolean) => {
+      if (!checked) {
+        setSelected({})
+        return
+      }
+      const next: Record<string, boolean> = {}
+      for (const it of items) next[it.id] = true
+      setSelected(next)
+    },
+    [items],
+  )
+
+  const bulkDelete = useCallback(async () => {
+    const ids = Object.entries(selected)
+      .filter(([, v]) => v)
+      .map(([k]) => k)
+    if (!ids.length) return
+    const ok = window.confirm(`确认删除选中的 ${ids.length} 份简历？此操作不可恢复。`)
+    if (!ok) return
+    setError(null)
+    setBusy(true)
+    try {
+      await deleteResumes(ids)
+      await load()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : '删除失败')
+    } finally {
+      setBusy(false)
+    }
+  }, [selected, load])
 
   useEffect(() => {
     void load()
@@ -148,9 +183,33 @@ export default function ResumesPage() {
           </div>
         ) : null}
 
+        <div className="mt-4 flex items-center justify-between">
+          <div className="text-sm text-zinc-600">已选 {selectedCount} 条</div>
+          <button
+            type="button"
+            onClick={() => void bulkDelete()}
+            disabled={busy || selectedCount === 0}
+            className={cn(
+              'rounded-md px-3 py-2 text-sm font-medium transition-colors',
+              busy || selectedCount === 0
+                ? 'bg-zinc-200 text-zinc-500'
+                : 'bg-red-600 text-white hover:bg-red-700',
+            )}
+          >
+            删除选中
+          </button>
+        </div>
+
         <div className="mt-4 overflow-hidden rounded-lg border border-zinc-200 bg-white">
           <div className="grid grid-cols-12 gap-0 border-b border-zinc-200 bg-zinc-50 px-4 py-2 text-xs font-semibold text-zinc-700">
-            <div className="col-span-3">姓名</div>
+            <div className="col-span-1">
+              <input
+                type="checkbox"
+                checked={items.length > 0 && selectedCount === items.length}
+                onChange={(e) => toggleAll(e.target.checked)}
+              />
+            </div>
+            <div className="col-span-2">姓名</div>
             <div className="col-span-1">国家</div>
             <div className="col-span-2">联系方式</div>
             <div className="col-span-2">方向</div>
@@ -164,7 +223,14 @@ export default function ResumesPage() {
                 key={it.id}
                 className="grid grid-cols-12 gap-0 border-b border-zinc-100 px-4 py-3 text-sm text-zinc-800 last:border-b-0"
               >
-                <div className="col-span-3 truncate font-medium text-zinc-900">
+                <div className="col-span-1">
+                  <input
+                    type="checkbox"
+                    checked={!!selected[it.id]}
+                    onChange={(e) => setSelected((s) => ({ ...s, [it.id]: e.target.checked }))}
+                  />
+                </div>
+                <div className="col-span-2 truncate font-medium text-zinc-900">
                   {it.name || [it.first_name, it.last_name].filter(Boolean).join(' ') || '未命名'}
                 </div>
                 <div className="col-span-1 truncate text-zinc-700">{it.country || '-'}</div>

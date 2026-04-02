@@ -137,8 +137,9 @@ export async function onRequestPost(context: { request: Request; env: Record<str
     `Resume filename: ${filename || ''}\n` +
     `Resume text:\n${text}\n\n` +
     'Return JSON with keys: full_name, first_name, last_name, country, city, email, whatsapp, phone, work_years, education, intro_summary_original, intro_language, profile_summary, profile_summary_language, job_direction. Use null when unknown.\n' +
-    '- full_name should be the display name.\n' +
-    '- first_name/last_name should be split if possible.\n' +
+    '- full_name should be the display name exactly as written (keep diacritics).\n' +
+    '- first_name/last_name should be split if possible (given name vs family name). Keep diacritics.\n' +
+    '- If unsure about given/family order, set first_name/last_name to null but still return full_name.\n' +
     '- country should be a country name (e.g., United Arab Emirates) or ISO-2 if clearly present; do not guess.\n' +
     '- city should be the city part of location if present; do not guess.\n' +
     '- work_years MUST be derived from explicit date ranges in the WORK EXPERIENCE/EXPERIENCE section only (ignore EDUCATION years); use current year for Present; if ranges are missing, return null.\n' +

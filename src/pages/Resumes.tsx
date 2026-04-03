@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import TopBar from '@/components/TopBar'
 import StatusBadge from '@/components/StatusBadge'
-import { deleteResumes, listResumes, updateResume } from '@/lib/api'
+import { deleteResumes, listResumes, reparseResume, updateResume } from '@/lib/api'
 import { cn } from '@/lib/utils'
 import type { ResumeListItem } from '@/types/resume'
 
@@ -19,6 +19,9 @@ export default function ResumesPage() {
   const [saving, setSaving] = useState<Record<string, boolean>>({})
   const [selected, setSelected] = useState<Record<string, boolean>>({})
   const selectedCount = useMemo(() => Object.values(selected).filter(Boolean).length, [selected])
+  const [reparsing, setReparsing] = useState(false)
+  const [reparseDone, setReparseDone] = useState(0)
+  const [reparseTotal, setReparseTotal] = useState(0)
 
   const params = useMemo(
     () => ({ q, country, status }),
@@ -99,6 +102,36 @@ export default function ResumesPage() {
       setBusy(false)
     }
   }, [selected, load])
+
+  const bulkReparse = useCallback(
+    async (mode: 'selected' | 'all') => {
+      const ids =
+        mode === 'all'
+          ? items.map((x) => x.id)
+          : Object.entries(selected)
+              .filter(([, v]) => v)
+              .map(([k]) => k)
+      if (!ids.length) return
+      const ok = window.confirm(`确认重解析 ${ids.length} 份简历？耗时较长，请保持页面打开。`)
+      if (!ok) return
+      setError(null)
+      setReparsing(true)
+      setReparseDone(0)
+      setReparseTotal(ids.length)
+      try {
+        for (let i = 0; i < ids.length; i++) {
+          await reparseResume(ids[i] as string)
+          setReparseDone(i + 1)
+        }
+        await load()
+      } catch (e) {
+        setError(e instanceof Error ? e.message : '重解析失败')
+      } finally {
+        setReparsing(false)
+      }
+    },
+    [items, selected, load],
+  )
 
   useEffect(() => {
     void load()
@@ -185,20 +218,54 @@ export default function ResumesPage() {
 
         <div className="mt-4 flex items-center justify-between">
           <div className="text-sm text-zinc-600">已选 {selectedCount} 条</div>
-          <button
-            type="button"
-            onClick={() => void bulkDelete()}
-            disabled={busy || selectedCount === 0}
-            className={cn(
-              'rounded-md px-3 py-2 text-sm font-medium transition-colors',
-              busy || selectedCount === 0
-                ? 'bg-zinc-200 text-zinc-500'
-                : 'bg-red-600 text-white hover:bg-red-700',
-            )}
-          >
-            删除选中
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => void bulkReparse('selected')}
+              disabled={reparsing || selectedCount === 0}
+              className={cn(
+                'rounded-md px-3 py-2 text-sm font-medium transition-colors',
+                reparsing || selectedCount === 0
+                  ? 'bg-zinc-200 text-zinc-500'
+                  : 'bg-blue-600 text-white hover:bg-blue-700',
+              )}
+            >
+              重解析选中
+            </button>
+            <button
+              type="button"
+              onClick={() => void bulkReparse('all')}
+              disabled={reparsing || items.length === 0}
+              className={cn(
+                'rounded-md px-3 py-2 text-sm font-medium transition-colors',
+                reparsing || items.length === 0
+                  ? 'bg-zinc-200 text-zinc-500'
+                  : 'bg-zinc-900 text-white hover:bg-zinc-800',
+              )}
+            >
+              重解析全部
+            </button>
+            <button
+              type="button"
+              onClick={() => void bulkDelete()}
+              disabled={busy || reparsing || selectedCount === 0}
+              className={cn(
+                'rounded-md px-3 py-2 text-sm font-medium transition-colors',
+                busy || reparsing || selectedCount === 0
+                  ? 'bg-zinc-200 text-zinc-500'
+                  : 'bg-red-600 text-white hover:bg-red-700',
+              )}
+            >
+              删除选中
+            </button>
+          </div>
         </div>
+
+        {reparsing ? (
+          <div className="mt-3 rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-700">
+            重解析中… {reparseDone}/{reparseTotal}
+          </div>
+        ) : null}
 
         <div className="mt-4 overflow-hidden rounded-lg border border-zinc-200 bg-white">
           <div className="grid grid-cols-12 gap-0 border-b border-zinc-200 bg-zinc-50 px-4 py-2 text-xs font-semibold text-zinc-700">

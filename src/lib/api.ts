@@ -2,6 +2,7 @@ import type { ResumeDetail, ResumeListItem } from '@/types/resume'
 import { supabase } from '@/lib/supabaseClient'
 import { extractTextFromFile, parseResumeText, type ExtractOptions } from '@/lib/resumeParserClient'
 import { aiExtract } from '@/lib/aiExtract'
+import { parsePhoneNumberFromString } from 'libphonenumber-js'
 
 type ApiOk<T> = { success: true } & T
 
@@ -62,6 +63,58 @@ function pickFirst<T>(...vals: Array<T | null | undefined>) {
     if (typeof v === 'string' && !v.trim()) continue
     return v
   }
+  return null
+}
+
+function normalizeCountryIso2(country: string | null | undefined) {
+  const c = (country || '').trim()
+  if (!c) return null
+  if (/^[A-Z]{2}$/.test(c)) return c
+  const k = c.toLowerCase().replace(/\s+/g, ' ').trim()
+  const map: Record<string, string> = {
+    'united states': 'US',
+    usa: 'US',
+    'united kingdom': 'GB',
+    uk: 'GB',
+    england: 'GB',
+    brazil: 'BR',
+    brasil: 'BR',
+    portugal: 'PT',
+    spain: 'ES',
+    españa: 'ES',
+    mexico: 'MX',
+    méxico: 'MX',
+    canada: 'CA',
+    france: 'FR',
+    germany: 'DE',
+    deutschland: 'DE',
+    italy: 'IT',
+    uae: 'AE',
+    'united arab emirates': 'AE',
+    'saudi arabia': 'SA',
+    india: 'IN',
+    china: 'CN',
+    japan: 'JP',
+    korea: 'KR',
+  }
+  return map[k] || null
+}
+
+function normalizeToE164(phoneLike: string | null | undefined, country: string | null | undefined) {
+  const raw = (phoneLike || '').trim()
+  if (!raw) return null
+  const iso2 = normalizeCountryIso2(country)
+  const p = parsePhoneNumberFromString(raw, (iso2 as any) || undefined)
+  if (!p) return null
+  if (!p.isValid()) return null
+  return p.number
+}
+
+function computeWhatsApp(country: string | null | undefined, phone: string | null | undefined, whatsapp: string | null | undefined) {
+  const wa = normalizeToE164(whatsapp, country)
+  if (wa) return wa
+  const ph = normalizeToE164(phone, country)
+  if (ph) return ph
   return null
 }
 
@@ -232,7 +285,7 @@ export async function importResumeUpload(file: File, opts?: ImportOpts) {
     country: parsed.country || null,
     city: parsed.city || null,
     email: parsed.email || null,
-    whatsapp: parsed.whatsapp || null,
+    whatsapp: computeWhatsApp(parsed.country || null, parsed.phone || null, parsed.whatsapp || null),
     phone: parsed.phone || null,
     work_years: parsed.workYears ?? 0,
     education: parsed.education ?? null,
@@ -382,7 +435,7 @@ export async function importResumeUrl(url: string, opts?: ImportOpts) {
     country: parsed.country || null,
     city: parsed.city || null,
     email: parsed.email || null,
-    whatsapp: parsed.whatsapp || null,
+    whatsapp: computeWhatsApp(parsed.country || null, parsed.phone || null, parsed.whatsapp || null),
     phone: parsed.phone || null,
     work_years: parsed.workYears ?? 0,
     education: parsed.education ?? null,
@@ -585,7 +638,7 @@ export async function reparseResume(id: string) {
     country: parsed.country || null,
     city: parsed.city || null,
     email: parsed.email || null,
-    whatsapp: parsed.whatsapp || null,
+    whatsapp: computeWhatsApp(parsed.country || null, parsed.phone || null, parsed.whatsapp || null),
     phone: parsed.phone || null,
     work_years: parsed.workYears ?? 0,
     education: parsed.education ?? null,

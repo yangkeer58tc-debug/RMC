@@ -1,0 +1,38 @@
+update public.resumes
+set job_direction = case lower(trim(job_direction))
+  when 'driver' then 'Conductor'
+  when 'chauffeur' then 'Conductor'
+  when 'delivery driver' then 'Repartidor'
+  when 'delivery' then 'Repartidor'
+  when 'courier' then 'Mensajero'
+  when 'motorcycle courier' then 'Mensajero'
+  when 'chef' then 'Cocinero'
+  when 'cook' then 'Cocinero'
+  when 'kitchen helper' then 'Ayudante de cocina'
+  when 'kitchen assistant' then 'Ayudante de cocina'
+  when 'waiter' then 'Camarero'
+  when 'bartender' then 'Bartender'
+  when 'security guard' then 'Guardia de seguridad'
+  when 'guard' then 'Guardia de seguridad'
+  when 'cleaner' then 'Personal de limpieza'
+  when 'janitor' then 'Personal de limpieza'
+  when 'housekeeper' then 'Personal de limpieza'
+  when 'warehouse worker' then 'Almacén'
+  when 'warehouse' then 'Almacén'
+  when 'stock clerk' then 'Almacén'
+  when 'storekeeper' then 'Almacén'
+  when 'administrative assistant' then 'Asistente administrativo'
+  when 'assistant' then 'Asistente administrativo'
+  when 'receptionist' then 'Recepcionista'
+  when 'customer service' then 'Atención al cliente'
+  when 'sales' then 'Ventas'
+  when 'salesperson' then 'Ventas'
+  when 'electrician' then 'Electricista'
+  when 'plumber' then 'Fontanero'
+  when 'painter' then 'Pintor'
+  when 'construction worker' then 'Obrero'
+  when 'helper' then 'Ayudante'
+  else job_direction
+end
+where job_direction is not null and trim(job_direction) <> '';
+

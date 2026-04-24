@@ -144,10 +144,10 @@ export async function onRequestPost(context: { request: Request; env: Record<str
     '- city should be the city part of location if present; do not guess.\n' +
     '- work_years MUST be derived from explicit date ranges in the WORK EXPERIENCE/EXPERIENCE section only (ignore EDUCATION years); use current year for Present; if ranges are missing, return null.\n' +
     '- For OCR text, prioritize lines near headings like NAME/CONTACT/LOCATION/ABOUT/EXPERIENCE.\n' +
-    '- intro_summary_original must keep the resume original language.\n' +
-    '- profile_summary MUST be a recruiter-facing summary in the SAME language as the resume, 100-200 words (or 100-200 CJK characters if the resume is in Chinese/Japanese/Korean); do NOT directly copy long sentences; do not invent facts; include role, seniority, key skills, domain, location if present. It must end with a complete sentence. Set profile_summary_language to the language code (e.g., en, pt, fr, zh).'
+    '- intro_summary_original MUST be rewritten in neutral Spanish used in Mexico (es-MX), concise and professional.\n' +
+    '- profile_summary MUST be a recruiter-facing summary in Spanish (Mexico), 100-200 words; do NOT directly copy long sentences; do not invent facts; include role, seniority, key skills, domain, and location if present. It must end with a complete sentence. Set profile_summary_language to "es-MX".'
     +
-    '\n- job_direction MUST be a short Spanish category inferred from roles (e.g., Conductor, Cocinero, Guardia de seguridad, Personal de limpieza, Almacén, Asistente administrativo). If unclear, return null.'
+    '\n- job_direction MUST be a short Mexican-Spanish category inferred from roles (e.g., Chofer, Cocinero, Guardia de seguridad, Personal de limpieza, Almacén, Auxiliar administrativo). If unclear, return null.'
 
   const base = baseUrl.replace(/\/$/, '')
   const url = base.endsWith('/v1') ? base + '/chat/completions' : base + '/v1/chat/completions'

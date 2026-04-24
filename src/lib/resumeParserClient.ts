@@ -39,6 +39,193 @@ function normalizeWhitespace(s: string) {
   return s.replace(/\r\n/g, '\n').replace(/[\t\f\v]+/g, ' ').replace(/\u00a0/g, ' ')
 }
 
+function normalizeFieldKey(k: string) {
+  return k
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+}
+
+function splitDelimitedLine(line: string, delimiter: ',' | '\t') {
+  if (delimiter === '\t') return line.split('\t').map((x) => x.trim())
+  const out: string[] = []
+  let cur = ''
+  let inQuotes = false
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i]
+    if (ch === '"') {
+      if (inQuotes && line[i + 1] === '"') {
+        cur += '"'
+        i++
+      } else {
+        inQuotes = !inQuotes
+      }
+      continue
+    }
+    if (ch === ',' && !inQuotes) {
+      out.push(cur.trim())
+      cur = ''
+      continue
+    }
+    cur += ch
+  }
+  out.push(cur.trim())
+  return out
+}
+
+function pickMapped(m: Record<string, string>, keys: string[]) {
+  for (const k of keys) {
+    const v = m[k]
+    if (v && v.trim()) return v.trim()
+  }
+  return undefined
+}
+
+function safeJsonArray(raw: string | undefined) {
+  if (!raw) return null
+  const t = raw.trim()
+  if (!t || t === '\\N' || t === 'null') return null
+  try {
+    const parsed = JSON.parse(t)
+    return Array.isArray(parsed) ? parsed : null
+  } catch {
+    return null
+  }
+}
+
+function rangeTextToYears(v: string | undefined) {
+  if (!v) return undefined
+  const t = v.trim().toLowerCase()
+  if (!t || t === '\\n') return undefined
+  const zh = t.match(/(\d+)\s*[-~]\s*(\d+)\s*年/)
+  if (zh) return Number(zh[2])
+  if (t.includes('8+') || t.includes('8 years') || t.includes('8年以上')) return 8
+  const n = t.match(/\d{1,2}/)
+  return n ? Number(n[0]) : undefined
+}
+
+function buildEducationFromStandardized(mapped: Record<string, string>): EducationItem[] | undefined {
+  const arr = safeJsonArray(pickMapped(mapped, ['education_experience', 'education_history', 'education']))
+  if (arr?.length) {
+    const out: EducationItem[] = []
+    for (const it of arr.slice(0, 12)) {
+      const o = it as Record<string, unknown>
+      const subject = typeof o.subject === 'string' ? o.subject : ''
+      const degree = typeof o.degree === 'string' ? o.degree : ''
+      const timeRange = typeof o.time_range === 'string' ? o.time_range : ''
+      const raw = [subject, degree, timeRange].filter(Boolean).join(' | ')
+      out.push({
+        degree: degree || undefined,
+        startDate: timeRange || undefined,
+        raw: raw || undefined,
+      })
+    }
+    return out.filter((x) => x.degree || x.startDate || x.raw)
+  }
+  const educationLevel = pickMapped(mapped, ['education_level'])
+  return educationLevel ? [{ degree: educationLevel, raw: educationLevel }] : undefined
+}
+
+function pullContactFromUserConcat(mapped: Record<string, string>) {
+  const arr = safeJsonArray(pickMapped(mapped, ['user_concat', 'contacts', 'contact_list']))
+  const out: { email?: string; phone?: string } = {}
+  for (const it of arr || []) {
+    const o = it as Record<string, unknown>
+    const type = typeof o.type === 'string' ? o.type.toLowerCase() : ''
+    const value = typeof o.value === 'string' ? o.value.trim() : ''
+    if (!value) continue
+    if (type === 'email' && !out.email) out.email = value
+    else if (type === 'phone' && !out.phone) out.phone = value
+  }
+  return out
+}
+
+function parseStructuredResumeRow(text: string): Omit<ParsedResume, 'textContent'> | null {
+  const lines = text
+    .replace(/\r\n/g, '\n')
+    .split('\n')
+    .map((l) => l.trim())
+    .filter(Boolean)
+  if (lines.length < 2) return null
+
+  const header = lines[0]
+  const value = lines[1]
+  const delimiter: ',' | '\t' = header.includes('\t') ? '\t' : ','
+  if (!header.includes(delimiter) || !value.includes(delimiter)) return null
+
+  const headCols = splitDelimitedLine(header, delimiter).map(normalizeFieldKey)
+  const valCols = splitDelimitedLine(value, delimiter)
+  if (headCols.length < 5 || valCols.length < 3) return null
+
+  const hints = [
+    'first_name',
+    'last_name',
+    'full_name',
+    'email',
+    'phone',
+    'city',
+    'country',
+    'work_years',
+    'summary',
+    'user_name',
+    'user_concat',
+    'education_experience',
+    'work_experience',
+    'personal_statement',
+  ]
+  if (!headCols.some((h) => hints.includes(h))) return null
+
+  const mapped: Record<string, string> = {}
+  for (let i = 0; i < Math.min(headCols.length, valCols.length); i++) {
+    const key = headCols[i]
+    if (!key) continue
+    mapped[key] = valCols[i] || ''
+  }
+
+  const firstName = pickMapped(mapped, ['first_name', 'firstname', 'given_name'])
+  const lastName = pickMapped(mapped, ['last_name', 'lastname', 'family_name', 'surname'])
+  const fullName = pickMapped(mapped, ['full_name', 'name', 'candidate_name'])
+  const name = fullName || [firstName, lastName].filter(Boolean).join(' ').trim() || undefined
+
+  const contact = pullContactFromUserConcat(mapped)
+  const workYearsRaw = pickMapped(mapped, [
+    'work_years',
+    'work_experience_years',
+    'years_experience',
+    'experience_years',
+    'total_experience_years',
+  ])
+  const workYears = rangeTextToYears(workYearsRaw)
+
+  const education = buildEducationFromStandardized(mapped)
+  const summaryRaw = pickMapped(mapped, [
+    'summary',
+    'professional_summary',
+    'profile_summary',
+    'intro_summary_original',
+    'self_introduction',
+    'about_me',
+    'personal_statement',
+    'work_industry',
+    'work_skills',
+  ])
+  const introSummaryOriginal = summaryRaw || pickMapped(mapped, ['resume_text', 'raw_text'])?.slice(0, 520)
+
+  return {
+    name: name || pickMapped(mapped, ['user_name']),
+    country: pickMapped(mapped, ['country', 'nation', 'nationality']),
+    city: pickMapped(mapped, ['city', 'location_city']),
+    email: pickMapped(mapped, ['email', 'email_address']) || contact.email,
+    whatsapp: pickMapped(mapped, ['whatsapp', 'whatsapp_number']),
+    phone: pickMapped(mapped, ['phone', 'phone_number', 'mobile']) || contact.phone,
+    workYears: typeof workYears === 'number' && Number.isFinite(workYears) ? workYears : undefined,
+    education,
+    introSummaryOriginal,
+    introLanguage: undefined,
+  }
+}
+
 function firstNonEmptyLine(lines: string[]) {
   for (const l of lines) {
     const t = l.trim()
@@ -416,14 +603,17 @@ export async function extractTextFromFile(file: File, opts?: ExtractOptions): Pr
 
 export function parseResumeText(text: string): Omit<ParsedResume, 'textContent'> {
   const normalized = normalizeWhitespace(text)
-  const name = extractName(normalized)
-  const { country, city } = extractLocation(normalized)
-  const email = extractEmail(normalized)
-  const whatsapp = extractWhatsApp(normalized)
-  const phone = extractPhone(normalized)
-  const workYears = extractWorkYears(normalized)
-  const education = extractEducation(normalized)
-  const introSummaryOriginal = buildIntroSummary(normalized)
+  const structured = parseStructuredResumeRow(normalized)
+  const name = structured?.name || extractName(normalized)
+  const loc = extractLocation(normalized)
+  const country = structured?.country || loc.country
+  const city = structured?.city || loc.city
+  const email = structured?.email || extractEmail(normalized)
+  const whatsapp = structured?.whatsapp || extractWhatsApp(normalized)
+  const phone = structured?.phone || extractPhone(normalized)
+  const workYears = structured?.workYears ?? extractWorkYears(normalized)
+  const education = structured?.education || extractEducation(normalized)
+  const introSummaryOriginal = structured?.introSummaryOriginal || buildIntroSummary(normalized)
   const sampleForLang = firstNonEmptyLine(normalized.split('\n').slice(0, 30)) || introSummaryOriginal || normalized.slice(0, 200)
   const introLanguage = sampleForLang ? franc(sampleForLang) : undefined
 

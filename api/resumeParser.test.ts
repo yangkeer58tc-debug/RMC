@@ -49,4 +49,31 @@ Technical University of Berlin, Master of Science, Computer Science
     expect(r.workYears).toBe(5)
     expect(r.education?.length ?? 0).toBeGreaterThan(0)
   })
+
+  it('parses standardized CSV row format', () => {
+    const text = `first_name,last_name,email,city,country,work_experience_years,education,summary
+Ana,Silva,ana.silva@example.com,Lisbon,Portugal,6,"BSc Computer Science, University of Lisbon","Full-stack engineer focused on React and Node.js with strong delivery ownership."`
+
+    const r = parseResumeText(text)
+    expect(r.name).toBe('Ana Silva')
+    expect(r.email).toBe('ana.silva@example.com')
+    expect(r.city).toBe('Lisbon')
+    expect(r.country).toBe('Portugal')
+    expect(r.workYears).toBe(6)
+    expect(r.introSummaryOriginal).toContain('Full-stack engineer')
+    expect(r.education?.[0]?.raw).toContain('University of Lisbon')
+  })
+
+  it('parses myjob-like tabular row with JSON columns', () => {
+    const text = `user_id\tresume_id\tuser_name\tuser_concat\teducation_level\teducation_experience\twork_experience\twork_years\twork_industry\twork_skills\tpersonal_statement
+1\tabc\tERICK DE LIMA NERY\t[{"value":"(75) 9 9289-0830","type":"phone"},{"value":"neryerick2000@gmail.com","type":"email"}]\tHigh school\t[{"subject":"High school","degree":"High school","is_completed":true}]\t[{"time_range":"2024-10 - 2025-08","position":"Motorista","company":"Duro na Queda"}]\t5-8年\tConstruction\tMOPP, Dirección defensiva\tI am seeking a position as a Heavy Vehicle Driver.`
+
+    const r = parseResumeText(text)
+    expect(r.name).toBe('ERICK DE LIMA NERY')
+    expect(r.email).toBe('neryerick2000@gmail.com')
+    expect(r.phone).toContain('9289')
+    expect(r.workYears).toBe(8)
+    expect(r.education?.[0]?.degree).toBe('High school')
+    expect(r.introSummaryOriginal).toContain('Heavy Vehicle Driver')
+  })
 })

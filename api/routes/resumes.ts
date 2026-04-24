@@ -17,6 +17,24 @@ function safeBasename(name: string) {
   return cleaned.slice(0, 120) || 'resume'
 }
 
+function stripNul(s: string | null | undefined): string | null {
+  if (s == null) return s
+  return s.includes('\0') ? s.replace(/\u0000/g, '') : s
+}
+
+function sanitizeEducationNul(ed: EducationItem[] | null): EducationItem[] | null {
+  if (ed == null) return null
+  if (!ed.length) return ed
+  return ed.map((e) => {
+    const out: EducationItem = {}
+    for (const [k, v] of Object.entries(e)) {
+      if (typeof v === 'string') (out as Record<string, unknown>)[k] = stripNul(v) ?? ''
+      else if (v !== undefined) (out as Record<string, unknown>)[k] = v
+    }
+    return out
+  })
+}
+
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 15 * 1024 * 1024 },
@@ -81,17 +99,17 @@ async function parseAndUpdate(resumeId: string, buffer: Buffer, filename: string
     const { error } = await supabaseAdmin
       .from('resumes')
       .update({
-        text_content: text || null,
-        name: parsed.name ?? null,
-        country: parsed.country ?? null,
-        city: parsed.city ?? null,
-        email: parsed.email ?? null,
-        whatsapp: parsed.whatsapp ?? null,
-        phone: parsed.phone ?? null,
+        text_content: stripNul(text || null),
+        name: stripNul(parsed.name ?? null),
+        country: stripNul(parsed.country ?? null),
+        city: stripNul(parsed.city ?? null),
+        email: stripNul(parsed.email ?? null),
+        whatsapp: stripNul(parsed.whatsapp ?? null),
+        phone: stripNul(parsed.phone ?? null),
         work_years: parsed.workYears ?? null,
-        education,
-        intro_summary_original: parsed.introSummaryOriginal ?? null,
-        intro_language: parsed.introLanguage ?? null,
+        education: sanitizeEducationNul(education),
+        intro_summary_original: stripNul(parsed.introSummaryOriginal ?? null),
+        intro_language: stripNul(parsed.introLanguage ?? null),
         parse_status: 'success',
         parse_error: null,
         updated_at: nowIso(),
@@ -104,7 +122,7 @@ async function parseAndUpdate(resumeId: string, buffer: Buffer, filename: string
     const message = e instanceof Error ? e.message : 'Parse failed'
     await supabaseAdmin
       .from('resumes')
-      .update({ parse_status: 'failed', parse_error: message, updated_at: nowIso() })
+      .update({ parse_status: 'failed', parse_error: stripNul(message), updated_at: nowIso() })
       .eq('id', resumeId)
     return { status: 'failed' as const, errorMessage: message }
   }
@@ -273,15 +291,17 @@ router.put('/:id', async (req: Request, res: Response) => {
   const data = parsedBody.data
   const patch: Record<string, unknown> = { updated_at: nowIso() }
 
-  if ('name' in data) patch.name = data.name
-  if ('country' in data) patch.country = data.country
-  if ('city' in data) patch.city = data.city
-  if ('email' in data) patch.email = data.email
-  if ('whatsapp' in data) patch.whatsapp = data.whatsapp
-  if ('phone' in data) patch.phone = data.phone
+  if ('name' in data) patch.name = data.name != null ? stripNul(data.name) : data.name
+  if ('country' in data) patch.country = data.country != null ? stripNul(data.country) : data.country
+  if ('city' in data) patch.city = data.city != null ? stripNul(data.city) : data.city
+  if ('email' in data) patch.email = data.email != null ? stripNul(data.email) : data.email
+  if ('whatsapp' in data) patch.whatsapp = data.whatsapp != null ? stripNul(data.whatsapp) : data.whatsapp
+  if ('phone' in data) patch.phone = data.phone != null ? stripNul(data.phone) : data.phone
   if ('work_years' in data) patch.work_years = data.work_years
-  if ('education' in data) patch.education = (data.education as EducationItem[] | null) ?? null
-  if ('intro_summary_original' in data) patch.intro_summary_original = data.intro_summary_original
+  if ('education' in data) patch.education = sanitizeEducationNul((data.education as EducationItem[] | null) ?? null)
+  if ('intro_summary_original' in data)
+    patch.intro_summary_original =
+      data.intro_summary_original != null ? stripNul(data.intro_summary_original) : data.intro_summary_original
 
   try {
     const supabaseAdmin = getSupabaseAdmin()

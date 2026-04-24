@@ -1,4 +1,4 @@
-import type { ResumeDetail, ResumeListItem } from '@/types/resume'
+import type { EducationItem, ResumeDetail, ResumeListItem } from '@/types/resume'
 import { supabase } from '@/lib/supabaseClient'
 import { extractTextFromFile, parseResumeText, type ExtractOptions } from '@/lib/resumeParserClient'
 import { aiExtract } from '@/lib/aiExtract'
@@ -21,6 +21,25 @@ function friendlyStorageUploadErrorMessage(raw: string) {
     return '上传失败：Supabase Storage 未授权（RLS）。请在 Supabase SQL Editor 执行 README 里的 storage.objects policy，然后重试。'
   }
   return raw
+}
+
+/** Postgres / jsonb 无法安全存储 U+0000；含 NUL 时易出现 `unsupported Unicode escape sequence`。 */
+function stripNul(s: string | null | undefined): string | null {
+  if (s == null) return s
+  return s.includes('\0') ? s.replace(/\u0000/g, '') : s
+}
+
+function sanitizeEducationNul(ed: EducationItem[] | null | undefined): EducationItem[] | null {
+  if (ed == null) return null
+  if (!ed.length) return ed
+  return ed.map((e) => {
+    const out: EducationItem = {}
+    for (const [k, v] of Object.entries(e)) {
+      if (typeof v === 'string') (out as Record<string, unknown>)[k] = stripNul(v) ?? ''
+      else if (v !== undefined) (out as Record<string, unknown>)[k] = v
+    }
+    return out
+  })
 }
 
 function guessFilenameFromUrl(url: string) {
@@ -275,30 +294,30 @@ export async function importResumeUpload(file: File, opts?: ImportOpts) {
     source_url: null as string | null,
     storage_bucket,
     storage_path,
-    original_filename: file.name,
-    text_content,
-    first_name: ((parsed as any).firstName as string | undefined) || null,
-    last_name: ((parsed as any).lastName as string | undefined) || null,
-    name: (parsed.name || inferNameFromFilename(file.name)) || null,
-    job_direction: ((parsed as any).jobDirection as string | undefined) || null,
+    original_filename: stripNul(file.name),
+    text_content: stripNul(text_content),
+    first_name: stripNul(((parsed as any).firstName as string | undefined) || null),
+    last_name: stripNul(((parsed as any).lastName as string | undefined) || null),
+    name: stripNul((parsed.name || inferNameFromFilename(file.name)) || null),
+    job_direction: stripNul(((parsed as any).jobDirection as string | undefined) || null),
     admin_note: null,
-    country: parsed.country || null,
-    city: parsed.city || null,
-    email: parsed.email || null,
-    whatsapp: computeWhatsApp(parsed.country || null, parsed.phone || null, parsed.whatsapp || null),
-    phone: parsed.phone || null,
+    country: stripNul(parsed.country || null),
+    city: stripNul(parsed.city || null),
+    email: stripNul(parsed.email || null),
+    whatsapp: stripNul(computeWhatsApp(parsed.country || null, parsed.phone || null, parsed.whatsapp || null)),
+    phone: stripNul(parsed.phone || null),
     work_years: parsed.workYears ?? 0,
-    education: parsed.education ?? null,
-    intro_summary_original: parsed.introSummaryOriginal || null,
-    intro_language: parsed.introLanguage || null,
-    profile_summary: ((parsed as any).profileSummary as string | undefined) || null,
-    profile_summary_language: ((parsed as any).profileSummaryLanguage as string | undefined) || null,
+    education: sanitizeEducationNul(parsed.education ?? null),
+    intro_summary_original: stripNul(parsed.introSummaryOriginal || null),
+    intro_language: stripNul(parsed.introLanguage || null),
+    profile_summary: stripNul(((parsed as any).profileSummary as string | undefined) || null),
+    profile_summary_language: stripNul(((parsed as any).profileSummaryLanguage as string | undefined) || null),
     ai_used: ((parsed as any).aiUsed as boolean | undefined) || false,
-    ai_model: ((parsed as any).aiModel as string | null | undefined) || null,
-    ai_error: ((parsed as any).aiError as string | null | undefined) || null,
+    ai_model: stripNul(((parsed as any).aiModel as string | null | undefined) || null),
+    ai_error: stripNul(((parsed as any).aiError as string | null | undefined) || null),
     ai_extracted_at: ((parsed as any).aiExtractedAt as string | null | undefined) || null,
     parse_status,
-    parse_error,
+    parse_error: stripNul(parse_error),
   }
 
   opts?.onProgress?.('入库中…')
@@ -422,33 +441,33 @@ export async function importResumeUrl(url: string, opts?: ImportOpts) {
 
   const payload = {
     source_type: 'url' as const,
-    source_url: url,
+    source_url: stripNul(url),
     storage_bucket,
     storage_path,
-    original_filename: filename,
-    text_content,
-    first_name: ((parsed as any).firstName as string | undefined) || null,
-    last_name: ((parsed as any).lastName as string | undefined) || null,
-    name: (parsed.name || inferNameFromFilename(filename)) || null,
-    job_direction: ((parsed as any).jobDirection as string | undefined) || null,
+    original_filename: stripNul(filename),
+    text_content: stripNul(text_content),
+    first_name: stripNul(((parsed as any).firstName as string | undefined) || null),
+    last_name: stripNul(((parsed as any).lastName as string | undefined) || null),
+    name: stripNul((parsed.name || inferNameFromFilename(filename)) || null),
+    job_direction: stripNul(((parsed as any).jobDirection as string | undefined) || null),
     admin_note: null,
-    country: parsed.country || null,
-    city: parsed.city || null,
-    email: parsed.email || null,
-    whatsapp: computeWhatsApp(parsed.country || null, parsed.phone || null, parsed.whatsapp || null),
-    phone: parsed.phone || null,
+    country: stripNul(parsed.country || null),
+    city: stripNul(parsed.city || null),
+    email: stripNul(parsed.email || null),
+    whatsapp: stripNul(computeWhatsApp(parsed.country || null, parsed.phone || null, parsed.whatsapp || null)),
+    phone: stripNul(parsed.phone || null),
     work_years: parsed.workYears ?? 0,
-    education: parsed.education ?? null,
-    intro_summary_original: parsed.introSummaryOriginal || null,
-    intro_language: parsed.introLanguage || null,
-    profile_summary: ((parsed as any).profileSummary as string | undefined) || null,
-    profile_summary_language: ((parsed as any).profileSummaryLanguage as string | undefined) || null,
+    education: sanitizeEducationNul(parsed.education ?? null),
+    intro_summary_original: stripNul(parsed.introSummaryOriginal || null),
+    intro_language: stripNul(parsed.introLanguage || null),
+    profile_summary: stripNul(((parsed as any).profileSummary as string | undefined) || null),
+    profile_summary_language: stripNul(((parsed as any).profileSummaryLanguage as string | undefined) || null),
     ai_used: ((parsed as any).aiUsed as boolean | undefined) || false,
-    ai_model: ((parsed as any).aiModel as string | null | undefined) || null,
-    ai_error: ((parsed as any).aiError as string | null | undefined) || null,
+    ai_model: stripNul(((parsed as any).aiModel as string | null | undefined) || null),
+    ai_error: stripNul(((parsed as any).aiError as string | null | undefined) || null),
     ai_extracted_at: ((parsed as any).aiExtractedAt as string | null | undefined) || null,
     parse_status,
-    parse_error,
+    parse_error: stripNul(parse_error),
   }
 
   opts?.onProgress?.('入库中…')
@@ -546,7 +565,11 @@ export async function updateResume(id: string, patch: Partial<ResumeDetail>) {
     'profile_summary_language',
   ]
   for (const k of allowed) {
-    if (k in patch) body[k] = (patch as Record<string, unknown>)[k]
+    if (!(k in patch)) continue
+    let v = (patch as Record<string, unknown>)[k]
+    if (k === 'education') v = sanitizeEducationNul(v as EducationItem[] | null | undefined)
+    else if (typeof v === 'string') v = stripNul(v)
+    body[k] = v
   }
   body.updated_at = new Date().toISOString()
 
@@ -630,28 +653,28 @@ export async function reparseResume(id: string) {
   }
 
   const patch = {
-    text_content,
-    first_name: ((parsed as any).firstName as string | undefined) || null,
-    last_name: ((parsed as any).lastName as string | undefined) || null,
-    name: (parsed.name || inferNameFromFilename(filename)) || null,
-    job_direction: ((parsed as any).jobDirection as string | undefined) || null,
-    country: parsed.country || null,
-    city: parsed.city || null,
-    email: parsed.email || null,
-    whatsapp: computeWhatsApp(parsed.country || null, parsed.phone || null, parsed.whatsapp || null),
-    phone: parsed.phone || null,
+    text_content: stripNul(text_content),
+    first_name: stripNul(((parsed as any).firstName as string | undefined) || null),
+    last_name: stripNul(((parsed as any).lastName as string | undefined) || null),
+    name: stripNul((parsed.name || inferNameFromFilename(filename)) || null),
+    job_direction: stripNul(((parsed as any).jobDirection as string | undefined) || null),
+    country: stripNul(parsed.country || null),
+    city: stripNul(parsed.city || null),
+    email: stripNul(parsed.email || null),
+    whatsapp: stripNul(computeWhatsApp(parsed.country || null, parsed.phone || null, parsed.whatsapp || null)),
+    phone: stripNul(parsed.phone || null),
     work_years: parsed.workYears ?? 0,
-    education: parsed.education ?? null,
-    intro_summary_original: parsed.introSummaryOriginal || null,
-    intro_language: parsed.introLanguage || null,
-    profile_summary: ((parsed as any).profileSummary as string | undefined) || null,
-    profile_summary_language: ((parsed as any).profileSummaryLanguage as string | undefined) || null,
+    education: sanitizeEducationNul(parsed.education ?? null),
+    intro_summary_original: stripNul(parsed.introSummaryOriginal || null),
+    intro_language: stripNul(parsed.introLanguage || null),
+    profile_summary: stripNul(((parsed as any).profileSummary as string | undefined) || null),
+    profile_summary_language: stripNul(((parsed as any).profileSummaryLanguage as string | undefined) || null),
     ai_used: ((parsed as any).aiUsed as boolean | undefined) || false,
-    ai_model: ((parsed as any).aiModel as string | null | undefined) || null,
-    ai_error: ((parsed as any).aiError as string | null | undefined) || null,
+    ai_model: stripNul(((parsed as any).aiModel as string | null | undefined) || null),
+    ai_error: stripNul(((parsed as any).aiError as string | null | undefined) || null),
     ai_extracted_at: ((parsed as any).aiExtractedAt as string | null | undefined) || null,
     parse_status,
-    parse_error,
+    parse_error: stripNul(parse_error),
     updated_at: new Date().toISOString(),
   }
 

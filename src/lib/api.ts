@@ -10,6 +10,13 @@ type ImportOpts = {
   onProgress?: (msg: string) => void
 }
 
+type BatchImportResult = {
+  total: number
+  success: number
+  failed: number
+  errors: string[]
+}
+
 function sbErrorMessage(e: unknown, fallback: string) {
   const msg = (e as { message?: string })?.message
   return msg || fallback
@@ -207,6 +214,148 @@ function normalizeExt(name: string) {
 function getPublicFileUrl(bucket: string, path: string) {
   const { data } = supabase.storage.from(bucket).getPublicUrl(path)
   return data.publicUrl
+}
+
+function splitDelimitedLine(line: string, delimiter: ',' | '\t') {
+  if (delimiter === '\t') return line.split('\t').map((x) => x.trim())
+  const out: string[] = []
+  let cur = ''
+  let inQuotes = false
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i]
+    if (ch === '"') {
+      if (inQuotes && line[i + 1] === '"') {
+        cur += '"'
+        i++
+      } else {
+        inQuotes = !inQuotes
+      }
+      continue
+    }
+    if (ch === ',' && !inQuotes) {
+      out.push(cur.trim())
+      cur = ''
+      continue
+    }
+    cur += ch
+  }
+  out.push(cur.trim())
+  return out
+}
+
+function parseDelimitedText(text: string) {
+  const lines = text.replace(/\r\n/g, '\n').split('\n').filter((l) => l.trim())
+  if (lines.length < 2) return { headers: [] as string[], rows: [] as string[][] }
+  const headerLine = lines[0] || ''
+  const delimiter: ',' | '\t' = headerLine.includes('\t') ? '\t' : ','
+  const headers = splitDelimitedLine(headerLine, delimiter)
+  const rows = lines.slice(1).map((l) => splitDelimitedLine(l, delimiter))
+  return { headers, rows }
+}
+
+async function readBatchFileText(file: File) {
+  const lower = file.name.toLowerCase()
+  if (lower.endsWith('.xlsx') || lower.endsWith('.xls')) {
+    throw new Error('暂不支持直接解析 xlsx/xls，请在 Excel 中“另存为 CSV（UTF-8）”后再上传。')
+  }
+  return await file.text()
+}
+
+export async function importResumeBatch(file: File, opts?: ImportOpts): Promise<BatchImportResult> {
+  opts?.onProgress?.('读取批量文件中…')
+  const text = await readBatchFileText(file)
+  const { headers, rows } = parseDelimitedText(text)
+  if (!headers.length || !rows.length) throw new Error('未识别到可导入的数据行，请检查 CSV/TSV 是否包含表头和至少 1 行数据。')
+
+  const total = rows.length
+  let success = 0
+  const errors: string[] = []
+
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i] || []
+    const rowText = `${headers.join('\t')}\n${row.join('\t')}`
+    const rowNo = i + 1
+    opts?.onProgress?.(`(${rowNo}/${total}) 解析中…`)
+
+    try {
+      let parsed = parseResumeText(rowText)
+
+      opts?.onProgress?.(`(${rowNo}/${total}) AI 抽取中…`)
+      const aiRes = await aiExtract(rowText, `${file.name}#${rowNo}`)
+      const aiUsed = aiRes.ok
+      const aiModel = aiRes.meta?.model || null
+      let aiError: string | null = null
+      let ai: any = null
+      if (aiRes.ok) ai = aiRes.data
+      if ('error' in aiRes) aiError = aiRes.error
+      ;(parsed as any).aiUsed = aiUsed
+      ;(parsed as any).aiModel = aiModel
+      ;(parsed as any).aiError = aiError
+      ;(parsed as any).aiExtractedAt = aiUsed ? new Date().toISOString() : null
+
+      if (ai) {
+        parsed = {
+          ...parsed,
+          name: pickFirst(ai.full_name, parsed.name) || undefined,
+          country: pickFirst(ai.country, parsed.country) || undefined,
+          city: pickFirst(ai.city, parsed.city) || undefined,
+          email: pickFirst(ai.email, parsed.email) || undefined,
+          whatsapp: pickFirst(ai.whatsapp, parsed.whatsapp) || undefined,
+          phone: pickFirst(ai.phone, parsed.phone) || undefined,
+          workYears: chooseWorkYears(ai.work_years, parsed.workYears) ?? undefined,
+          education: mergeEducation(ai.education, parsed.education) ?? undefined,
+          introSummaryOriginal: pickFirst(ai.intro_summary_original, parsed.introSummaryOriginal) || undefined,
+          introLanguage: pickFirst(ai.intro_language, parsed.introLanguage) || undefined,
+        }
+        ;(parsed as any).jobDirection = pickFirst(ai.job_direction, (parsed as any).jobDirection) || undefined
+        ;(parsed as any).profileSummary = pickFirst(ai.profile_summary, (parsed as any).profileSummary) || undefined
+        ;(parsed as any).profileSummaryLanguage =
+          pickFirst(ai.profile_summary_language, parsed.introLanguage) || undefined
+      }
+
+      const inferred = inferNameParts(parsed.name)
+      const payload = {
+        source_type: 'upload' as const,
+        source_url: null as string | null,
+        storage_bucket: 'resumes',
+        storage_path: `table/${crypto.randomUUID()}.txt`,
+        original_filename: stripNul(`${file.name}#${rowNo}`),
+        text_content: stripNul(rowText),
+        first_name: stripNul(inferred.first_name),
+        last_name: stripNul(inferred.last_name),
+        name: stripNul(parsed.name || null),
+        job_direction: stripNul(((parsed as any).jobDirection as string | undefined) || null),
+        admin_note: null,
+        country: stripNul(parsed.country || null),
+        city: stripNul(parsed.city || null),
+        email: stripNul(parsed.email || null),
+        whatsapp: stripNul(computeWhatsApp(parsed.country || null, parsed.phone || null, parsed.whatsapp || null)),
+        phone: stripNul(parsed.phone || null),
+        work_years: parsed.workYears ?? 0,
+        education: sanitizeEducationNul(parsed.education ?? null),
+        intro_summary_original: stripNul(parsed.introSummaryOriginal || null),
+        intro_language: stripNul(parsed.introLanguage || null),
+        profile_summary: stripNul(((parsed as any).profileSummary as string | undefined) || null),
+        profile_summary_language: stripNul(((parsed as any).profileSummaryLanguage as string | undefined) || null),
+        ai_used: ((parsed as any).aiUsed as boolean | undefined) || false,
+        ai_model: stripNul(((parsed as any).aiModel as string | null | undefined) || null),
+        ai_error: stripNul(((parsed as any).aiError as string | null | undefined) || null),
+        ai_extracted_at: ((parsed as any).aiExtractedAt as string | null | undefined) || null,
+        parse_status: 'success' as const,
+        parse_error: null as string | null,
+      }
+
+      opts?.onProgress?.(`(${rowNo}/${total}) 入库中…`)
+      const { error } = await supabase.from('resumes').insert(payload)
+      if (error) throw new Error(sbErrorMessage(error, '入库失败'))
+      success += 1
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : '未知错误'
+      errors.push(`第 ${rowNo} 行：${msg}`)
+    }
+  }
+
+  return { total, success, failed: total - success, errors }
 }
 
 export async function importResumeUpload(file: File, opts?: ImportOpts) {

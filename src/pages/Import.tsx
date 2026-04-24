@@ -1,29 +1,33 @@
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import TopBar from '@/components/TopBar'
-import { importResumeUpload, importResumeUrl } from '@/lib/api'
+import { importResumeBatch, importResumeUpload, importResumeUrl } from '@/lib/api'
 import { cn } from '@/lib/utils'
 
-type Tab = 'upload' | 'url'
+type Tab = 'upload' | 'url' | 'batch'
 
 export default function ImportPage() {
   const nav = useNavigate()
   const [tab, setTab] = useState<Tab>('upload')
   const [files, setFiles] = useState<File[]>([])
+  const [batchFile, setBatchFile] = useState<File | null>(null)
   const [url, setUrl] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [progress, setProgress] = useState<string | null>(null)
+  const [batchResult, setBatchResult] = useState<string | null>(null)
 
   const canSubmit = useMemo(() => {
     if (busy) return false
     if (tab === 'upload') return files.length > 0
+    if (tab === 'batch') return !!batchFile
     return !!url.trim()
-  }, [busy, tab, files, url])
+  }, [busy, tab, files, batchFile, url])
 
   async function onSubmit() {
     setError(null)
     setProgress(null)
+    setBatchResult(null)
     setBusy(true)
     try {
       if (tab === 'upload') {
@@ -33,6 +37,12 @@ export default function ImportPage() {
             onProgress: (msg) => setProgress(`(${i + 1}/${files.length}) ${f.name} · ${msg}`),
           })
         }
+        nav('/resumes')
+      } else if (tab === 'batch') {
+        if (!batchFile) throw new Error('请先选择 Excel/CSV 文件')
+        const result = await importResumeBatch(batchFile, { onProgress: setProgress })
+        setBatchResult(`批量导入完成：成功 ${result.success}/${result.total}，失败 ${result.failed}`)
+        if (result.errors.length) setError(result.errors.slice(0, 5).join('\n'))
         nav('/resumes')
       } else {
         const data = await importResumeUrl(url.trim(), { onProgress: setProgress })
@@ -70,6 +80,18 @@ export default function ImportPage() {
             </button>
             <button
               type="button"
+              onClick={() => setTab('batch')}
+              className={cn(
+                'rounded-md px-3 py-2 text-sm font-medium transition-colors',
+                tab === 'batch'
+                  ? 'bg-zinc-900 text-white'
+                  : 'bg-zinc-100 text-zinc-700 hover:bg-zinc-200',
+              )}
+            >
+              Excel/CSV 批量
+            </button>
+            <button
+              type="button"
               onClick={() => setTab('url')}
               className={cn(
                 'rounded-md px-3 py-2 text-sm font-medium transition-colors',
@@ -97,6 +119,20 @@ export default function ImportPage() {
                   <div className="text-xs text-zinc-600">已选择 {files.length} 个文件</div>
                 ) : null}
               </div>
+            ) : tab === 'batch' ? (
+              <div className="space-y-3">
+                <label className="block text-sm font-medium text-zinc-800">选择批量文件（CSV / TSV / TXT）</label>
+                <input
+                  type="file"
+                  accept=".csv,.tsv,.txt,.xls,.xlsx"
+                  onChange={(e) => setBatchFile((e.target.files || [])[0] || null)}
+                  className="block w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm"
+                />
+                <div className="text-xs text-zinc-600">
+                  支持 MyJob 标准化表格字段（含 JSON 列）。Excel 请优先“另存为 CSV（UTF-8）”后上传。
+                </div>
+                {batchFile ? <div className="text-xs text-zinc-600">已选择：{batchFile.name}</div> : null}
+              </div>
             ) : (
               <div className="space-y-3">
                 <label className="block text-sm font-medium text-zinc-800">文件链接（可公开访问的直链）</label>
@@ -112,13 +148,18 @@ export default function ImportPage() {
           </div>
 
           {error ? (
-            <div className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+            <div className="mt-4 whitespace-pre-wrap rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
               {error}
             </div>
           ) : null}
           {progress ? (
             <div className="mt-4 rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2 text-xs text-zinc-700">
               {progress}
+            </div>
+          ) : null}
+          {batchResult ? (
+            <div className="mt-4 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+              {batchResult}
             </div>
           ) : null}
 
@@ -145,6 +186,7 @@ export default function ImportPage() {
             <li>自我介绍摘要为抽取式摘要，保持原语言，不做翻译。</li>
             <li>解析不准的字段可在详情页手动修改并保存。</li>
             <li>如果你配置了 Poe/OpenAI 兼容网关，系统会额外用 AI 做字段纠错与补全（详情页会显示 AI 是否生效）。</li>
+            <li>批量导入支持标准化表格字段，显示逐行处理进度与失败提示。</li>
           </ul>
         </div>
       </main>
